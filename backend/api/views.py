@@ -5,8 +5,23 @@ from .models import SummaryRequest
 from .serializers import SummaryRequestSerializer
 from .summarization import ExtractiveSummarizer
 import time
+from .abstractive import AbstractiveSummarizer
 
-summarizer = ExtractiveSummarizer(method='textrank')
+extractive_summarizer = ExtractiveSummarizer(method='textrank')
+abstractive_summarizer = None  # Пока не загружаем
+
+def get_abstractive_summarizer():
+    global abstractive_summarizer
+    if abstractive_summarizer is None:
+        try:
+            print("Начинаю загрузку абстрактивной модели (5 ГБ)...")
+            print("Это займет 5-10 минут в первый раз")
+            abstractive_summarizer = AbstractiveSummarizer()
+            print("Модель успешно загружена!")
+        except Exception as e:
+            print(f"НЕ УДАЛОСЬ ЗАГРУЗИТЬ МОДЕЛЬ: {e}")
+            abstractive_summarizer = None
+    return abstractive_summarizer
 
 class SummaryRequestViewSet(viewsets.ModelViewSet):
     serializer_class = SummaryRequestSerializer
@@ -38,24 +53,54 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
         start_time = time.time()
 
-        if summary_type == 'extractive':
-            try:
-                print("Пытаюсь сделать суммаризацию...")
-                output_text = summarizer.summarize(input_text, length_param)
-                print(f"Суммаризация успешна, длина результата: {len(output_text)}")
+        try:
+            if summary_type == 'extractive':
+                print("Экстрактивный метод...")
+                output_text = extractive_summarizer.summarize(input_text, length_param)
 
-                if len(output_text) == len(input_text):
-                    print("ВНИМАНИЕ: Результат совпадает с исходным текстом!")
-                    print("Пробуем другой метод...")
-                    alt_summarizer = ExtractiveSummarizer(method='lsa')
-                    output_text = alt_summarizer.summarize(input_text, length_param)
-                    print(f"Альтернативный метод, длина результата: {len(output_text)}")
 
-            except Exception as e:
-                print(f"ОШИБКА при суммаризации: {str(e)}")
-                output_text = f"Ошибка: {str(e)}"
-        else:
-            output_text = "Абстрактивный метод будет добавлен позже"
+
+            elif summary_type == 'abstractive':
+
+                print("Абстрактивный метод...")
+
+                print("Получаем суммаризатор...")
+
+                summ = get_abstractive_summarizer()
+
+                print(f"Суммаризатор получен: {summ}")
+
+                if summ:
+
+                    try:
+
+                        print("Вызываем summarize...")
+
+                        output_text = summ.summarize(
+
+                            input_text,
+
+                            max_length=length_param * 20,
+
+                            min_length=length_param * 10
+
+                        )
+
+                        print("Суммаризация выполнена")
+
+                    except Exception as e:
+
+                        print(f"Ошибка при вызове summarize: {e}")
+
+                        output_text = f"Ошибка: {e}"
+
+                else:
+
+                    output_text = "Абстрактивная модель не загрузилась. Попробуй позже."
+
+        except Exception as e:
+            print(f"ОШИБКА: {str(e)}")
+            output_text = f"Ошибка: {str(e)}"
 
         processing_time = time.time() - start_time
         print(f"Время обработки: {processing_time} сек")
