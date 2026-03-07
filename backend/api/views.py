@@ -8,7 +8,6 @@ import time
 
 summarizer = ExtractiveSummarizer(method='textrank')
 
-
 class SummaryRequestViewSet(viewsets.ModelViewSet):
     serializer_class = SummaryRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -22,9 +21,14 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def summarize(self, request):
+        print("=== МЕТОД SUMMARIZE ВЫЗВАН ===")
+
         input_text = request.data.get('input_text', '')
         summary_type = request.data.get('summary_type', 'extractive')
         length_param = int(request.data.get('length_param', 5))
+
+        print(f"Параметры: тип={summary_type}, длина={length_param}")
+        print(f"Длина текста: {len(input_text)} символов")
 
         if not input_text:
             return Response(
@@ -35,11 +39,26 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
         start_time = time.time()
 
         if summary_type == 'extractive':
-            output_text = summarizer.summarize(input_text, length_param)
+            try:
+                print("Пытаюсь сделать суммаризацию...")
+                output_text = summarizer.summarize(input_text, length_param)
+                print(f"Суммаризация успешна, длина результата: {len(output_text)}")
+
+                if len(output_text) == len(input_text):
+                    print("ВНИМАНИЕ: Результат совпадает с исходным текстом!")
+                    print("Пробуем другой метод...")
+                    alt_summarizer = ExtractiveSummarizer(method='lsa')
+                    output_text = alt_summarizer.summarize(input_text, length_param)
+                    print(f"Альтернативный метод, длина результата: {len(output_text)}")
+
+            except Exception as e:
+                print(f"ОШИБКА при суммаризации: {str(e)}")
+                output_text = f"Ошибка: {str(e)}"
         else:
             output_text = "Абстрактивный метод будет добавлен позже"
 
         processing_time = time.time() - start_time
+        print(f"Время обработки: {processing_time} сек")
 
         data = {
             'input_text': input_text,
@@ -53,4 +72,5 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
+        print("=== ЗАПРОС ОБРАБОТАН ===")
         return Response(serializer.data)
