@@ -14,4 +14,4 @@ class UploadedFileSerializer(serializers.ModelSerializer):
         model = UploadedFile
         fields = ['id', 'original_filename', 'file_size', 'file_type',
                   'extracted_text', 'uploaded_at']
-        read_only_fields = ['id', 'extracted_text', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_at']

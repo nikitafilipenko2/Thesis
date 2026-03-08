@@ -248,7 +248,10 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         summary_serializer.is_valid(raise_exception=True)
         summary_serializer.save(user=request.user)
 
+        # Сериализуем сам файл для ответа
+        file_serializer = self.get_serializer(file_record)
+
         return Response({
-            'file': serializer.data,
+            'file': file_serializer.data,
             'summary': summary_serializer.data
         })
