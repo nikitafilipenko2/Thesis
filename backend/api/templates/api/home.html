@@ -7,7 +7,7 @@
     <div class="col-lg-10">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-magic"></i> Суммаризация текста</h4>
+                <h4 class="mb-0"> Суммаризация текста</h4>
             </div>
             <div class="card-body">
                 <form id="summarizeForm">
@@ -54,14 +54,14 @@
                             <label class="form-label">Модель суммаризации</label>
                             <select class="form-select" id="modelSelect">
                                 <optgroup label="Экстрактивные (выделение предложений)">
-                                    <option value="extractive_textrank" selected>TextRank (баланс скорости и качества)</option>
-                                    <option value="extractive_lsa">LSA (тематическое моделирование)</option>
-                                    <option value="extractive_lexrank">LexRank (графовый метод)</option>
+                                    <option value="extractive_textrank" selected>TextRank</option>
+                                    <option value="extractive_lsa">LSA</option>
+                                    <option value="extractive_lexrank">LexRank</option>
                                 </optgroup>
                                 <optgroup label="Абстрактивные (нейросети)">
-                                    <option value="abstractive_mbart">mBART (русская, 5 ГБ)</option>
-                                    <option value="abstractive_rut5">ruT5 (русская, 1.5 ГБ)</option>
-                                    <option value="abstractive_cointegrated">cointegrated/rut5-base-absum (легкая, 500 МБ)</option>
+                                    <option value="abstractive_mbart">mBART</option>
+                                    <option value="abstractive_rut5">ruT5</option>
+                                    <option value="abstractive_cointegrated">cointegrated/rut5-base-absum</option>
                                 </optgroup>
                             </select>
                         </div>
@@ -95,7 +95,7 @@
                     <!-- Кнопка отправки -->
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                            <i class="bi bi-magic"></i> Суммаризировать
+                             Суммаризировать
                         </button>
                     </div>
                 </form>
