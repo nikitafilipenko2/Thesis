@@ -11,6 +11,12 @@ from .serializers import UploadedFileSerializer
 from .file_processor import FileProcessor
 import tempfile
 import os
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+
+
 
 extractive_summarizer = ExtractiveSummarizer(method='textrank')
 abstractive_summarizer = None  # Пока не загружаем
@@ -255,3 +261,68 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             'file': file_serializer.data,
             'summary': summary_serializer.data
         })
+
+
+def login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=username, password=password)
+        if user:
+            login(request, user)
+            messages.success(request, 'Вы успешно вошли')
+            return redirect('home')
+        else:
+            messages.error(request, 'Неверный логин или пароль')
+    return render(request, 'api/login.html')
+
+
+def logout_view(request):
+    logout(request)
+    messages.success(request, 'Вы вышли из системы')
+    return redirect('login')
+
+
+def register_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        password2 = request.POST.get('password2')
+
+        if password != password2:
+            messages.error(request, 'Пароли не совпадают')
+        elif len(password) < 6:
+            messages.error(request, 'Пароль должен быть не менее 6 символов')
+        else:
+            from django.contrib.auth.models import User
+            try:
+                user = User.objects.create_user(username=username, password=password)
+                messages.success(request, 'Регистрация успешна! Теперь войдите')
+                return redirect('login')
+            except:
+                messages.error(request, 'Пользователь с таким именем уже существует')
+
+    return render(request, 'api/register.html')
+
+
+@login_required
+def home_view(request):
+    return render(request, 'api/home.html')
+
+
+@login_required
+def history_view(request):
+    requests_list = SummaryRequest.objects.filter(user=request.user).order_by('-created_at')[:50]
+    return render(request, 'api/history.html', {'requests': requests_list})
+
+
+@login_required
+def files_view(request):
+    files_list = UploadedFile.objects.filter(user=request.user).order_by('-uploaded_at')
+    return render(request, 'api/files.html', {'files': files_list})
+
+
+@login_required
+def request_detail_view(request, pk):
+    req = get_object_or_404(SummaryRequest, pk=pk, user=request.user)
+    return render(request, 'api/request_detail.html', {'request': req})

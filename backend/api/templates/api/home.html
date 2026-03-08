@@ -1,0 +1,209 @@
+{% extends 'api/base.html' %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-magic"></i> Суммаризация текста</h4>
+            </div>
+            <div class="card-body">
+                <form id="summarizeForm">
+                    {% csrf_token %}
+                    
+                    <!-- Выбор режима ввода -->
+                    <ul class="nav nav-tabs mb-3" id="inputTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">
+                                <i class="bi bi-text-paragraph"></i> Текст
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab">
+                                <i class="bi bi-file-earmark"></i> Файл
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <!-- Содержимое вкладок -->
+                    <div class="tab-content mb-3">
+                        <!-- Вкладка с текстом -->
+                        <div class="tab-pane fade show active" id="text" role="tabpanel">
+                            <div class="mb-3">
+                                <label for="inputText" class="form-label">Введите текст</label>
+                                <textarea class="form-control" id="inputText" rows="8" placeholder="Вставьте текст для суммаризации..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Вкладка с файлом -->
+                        <div class="tab-pane fade" id="file" role="tabpanel">
+                            <div class="mb-3">
+                                <label for="fileInput" class="form-label">Выберите файл</label>
+                                <input type="file" class="form-control" id="fileInput" accept=".txt,.pdf,.docx">
+                                <div class="form-text">Поддерживаются .txt, .pdf, .docx (макс 10 МБ)</div>
+                            </div>
+                            <div id="fileInfo" class="alert alert-info d-none"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Параметры суммаризации -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="summaryType" class="form-label">Тип суммаризации</label>
+                            <select class="form-select" id="summaryType">
+                                <option value="extractive">Экстрактивная (выделение предложений)</option>
+                                <option value="abstractive">Абстрактивная (нейросеть)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="lengthParam" class="form-label">Длина результата: <span id="lengthValue">3</span> предл.</label>
+                            <input type="range" class="form-range" id="lengthParam" min="1" max="10" value="3">
+                        </div>
+                    </div>
+                    
+                    <!-- Кнопка отправки -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="bi bi-magic"></i> Суммаризировать
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Индикатор загрузки -->
+                <div id="loading" class="text-center my-4 d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <p class="mt-2">Обработка запроса...</p>
+                </div>
+                
+                <!-- Результат -->
+                <div id="resultSection" class="mt-4 d-none">
+                    <hr>
+                    <h5>Результат:</h5>
+                    <div class="result-box" id="resultText"></div>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary" id="copyBtn">
+                            <i class="bi bi-clipboard"></i> Копировать
+                        </button>
+                        <span class="text-muted ms-2" id="processingTime"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lengthSlider = document.getElementById('lengthParam');
+    const lengthValue = document.getElementById('lengthValue');
+    
+    lengthSlider.addEventListener('input', function() {
+        lengthValue.textContent = this.value;
+    });
+    
+    // Загрузка файла
+    document.getElementById('fileInput').addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        
+        document.getElementById('loading').classList.remove('d-none');
+        
+        try {
+            const response = await fetch('/api/files/upload/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                document.getElementById('fileInfo').textContent = `Файл загружен: ${data.original_filename} (${data.extracted_text.length} символов)`;
+                document.getElementById('fileInfo').classList.remove('d-none', 'alert-danger');
+                document.getElementById('fileInfo').classList.add('alert-success');
+                
+                // Переключаемся на вкладку с текстом и вставляем извлеченный текст
+                document.getElementById('text-tab').click();
+                document.getElementById('inputText').value = data.extracted_text;
+            } else {
+                document.getElementById('fileInfo').textContent = 'Ошибка: ' + (data.error || 'Неизвестная ошибка');
+                document.getElementById('fileInfo').classList.remove('d-none', 'alert-success');
+                document.getElementById('fileInfo').classList.add('alert-danger');
+            }
+        } catch (error) {
+            document.getElementById('fileInfo').textContent = 'Ошибка при загрузке файла';
+            document.getElementById('fileInfo').classList.remove('d-none', 'alert-success');
+            document.getElementById('fileInfo').classList.add('alert-danger');
+        } finally {
+            document.getElementById('loading').classList.add('d-none');
+        }
+    });
+    
+    // Отправка на суммаризацию
+    document.getElementById('summarizeForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const text = document.getElementById('inputText').value.trim();
+        if (!text) {
+            alert('Введите текст или загрузите файл');
+            return;
+        }
+        
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const resultSection = document.getElementById('resultSection');
+        
+        submitBtn.disabled = true;
+        loading.classList.remove('d-none');
+        resultSection.classList.add('d-none');
+        
+        const data = {
+            input_text: text,
+            summary_type: document.getElementById('summaryType').value,
+            length_param: parseInt(document.getElementById('lengthParam').value)
+        };
+        
+        try {
+            const response = await fetch('/api/requests/summarize/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                document.getElementById('resultText').innerHTML = result.output_text.replace(/\n/g, '<br>');
+                document.getElementById('processingTime').textContent = `Время: ${result.processing_time.toFixed(2)} сек`;
+                resultSection.classList.remove('d-none');
+            } else {
+                alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            alert('Ошибка при отправке запроса');
+        } finally {
+            submitBtn.disabled = false;
+            loading.classList.add('d-none');
+        }
+    });
+    
+    // Копирование результата
+    document.getElementById('copyBtn').addEventListener('click', function() {
+        const text = document.getElementById('resultText').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Скопировано!');
+        });
+    });
+});
+</script>
+{% endblock %}

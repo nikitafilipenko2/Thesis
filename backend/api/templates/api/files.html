@@ -1,0 +1,91 @@
+{% extends 'api/base.html' %}
+
+{% block title %}Мои файлы{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-files"></i> Загруженные файлы</h4>
+    </div>
+    <div class="card-body">
+        {% if files %}
+            <div class="row">
+                {% for file in files %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h5 class="card-title">
+                                            <i class="bi bi-file-earmark-{{ file.file_type }}"></i>
+                                            {{ file.original_filename }}
+                                        </h5>
+                                        <p class="card-text">
+                                            <small class="text-muted">
+                                                {{ file.file_type|upper }}, {{ file.file_size|filesizeformat }}
+                                                <br>
+                                                Загружен: {{ file.uploaded_at|date:"d.m.Y H:i" }}
+                                            </small>
+                                        </p>
+                                        {% if file.extracted_text %}
+                                            <p class="card-text">
+                                                <strong>Текст:</strong> 
+                                                {{ file.extracted_text|truncatechars:100 }}
+                                            </p>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-secondary">{{ file.id }}</span>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-primary" onclick="summarizeFile({{ file.id }})">
+                                    <i class="bi bi-magic"></i> Суммаризировать
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-center text-muted my-4">У вас пока нет загруженных файлов</p>
+            <div class="text-center">
+                <a href="/" class="btn btn-primary">Загрузить файл</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function summarizeFile(fileId) {
+    const length = prompt('Введите количество предложений (1-10):', '3');
+    if (!length) return;
+    
+    const type = confirm('Нажмите OK для абстрактивной суммаризации, Отмена для экстрактивной');
+    const summaryType = type ? 'abstractive' : 'extractive';
+    
+    fetch(`/api/files/${fileId}/summarize/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            summary_type: summaryType,
+            length_param: parseInt(length)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.summary) {
+            alert('Суммаризация выполнена! Результат сохранен в историю.');
+            window.location.href = '/history/';
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка при выполнении запроса');
+    });
+}
+</script>
+{% endblock %}
