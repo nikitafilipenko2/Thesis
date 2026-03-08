@@ -21,6 +21,64 @@ from django.contrib import messages
 extractive_summarizer = ExtractiveSummarizer(method='textrank')
 abstractive_summarizer = None  # Пока не загружаем
 
+_models = {}
+
+
+def load_all_models():
+    """Загружает все модели при старте приложения"""
+    print("=" * 50)
+    print("ЗАГРУЗКА ВСЕХ МОДЕЛЕЙ...")
+    print("=" * 50)
+
+    # Экстрактивные модели (они легкие, грузятся быстро)
+    print("Загрузка экстрактивных моделей...")
+    _models['extractive_textrank'] = ExtractiveSummarizer(method='textrank')
+    _models['extractive_lsa'] = ExtractiveSummarizer(method='lsa')
+    _models['extractive_lexrank'] = ExtractiveSummarizer(method='lexrank')
+    print("✓ Экстрактивные модели загружены")
+
+    # Абстрактивные модели (тяжелые, могут долго грузиться)
+    print("\nЗагрузка абстрактивных моделей (это может занять несколько минут)...")
+
+    try:
+        print("  - Загрузка cointegrated/rut5-base-absum (500 МБ)...")
+        _models['abstractive_cointegrated'] = AbstractiveSummarizer(
+            model_name="cointegrated/rut5-base-absum"
+        )
+        print("  ✓ cointegrated загружена")
+    except Exception as e:
+        print(f"  ✗ Ошибка загрузки cointegrated: {e}")
+
+    # try:
+    #     print("  - Загрузка IlyaGusev/rut5_base_sum_gazeta (1.5 ГБ)...")
+    #     _models['abstractive_rut5'] = AbstractiveSummarizer(
+    #         model_name="IlyaGusev/rut5_base_sum_gazeta"
+    #     )
+    #     print("  ✓ ruT5 загружена")
+    # except Exception as e:
+    #     print(f"  ✗ Ошибка загрузки ruT5: {e}")
+    #
+    # try:
+    #     print("  - Загрузка IlyaGusev/mbart_ru_sum_gazeta (5 ГБ)...")
+    #     _models['abstractive_mbart'] = AbstractiveSummarizer(
+    #         model_name="IlyaGusev/mbart_ru_sum_gazeta"
+    #     )
+    #     print("  ✓ mBART загружена")
+    # except Exception as e:
+    #     print(f"  ✗ Ошибка загрузки mBART: {e}")
+
+    print("\n" + "=" * 50)
+    print(f"ЗАГРУЖЕНО МОДЕЛЕЙ: {len(_models)}")
+    print("=" * 50)
+
+    return _models
+
+
+def get_model(model_name):
+    """Возвращает модель из кэша"""
+    if not _models:
+        load_all_models()
+    return _models.get(model_name)
 def get_abstractive_summarizer():
     global abstractive_summarizer
     if abstractive_summarizer is None:
@@ -50,10 +108,11 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
         print("=== МЕТОД SUMMARIZE ВЫЗВАН ===")
 
         input_text = request.data.get('input_text', '')
-        summary_type = request.data.get('summary_type', 'extractive')
-        length_param = int(request.data.get('length_param', 5))
+        model = request.data.get('model', 'extractive_textrank')
+        length_param = request.data.get('length_param', 5)
 
-        print(f"Параметры: тип={summary_type}, длина={length_param}")
+        print(f"Модель: {model}")
+        print(f"Параметры длины: {length_param}")
         print(f"Длина текста: {len(input_text)} символов")
 
         if not input_text:
@@ -65,70 +124,72 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
         start_time = time.time()
 
         try:
-            if summary_type == 'extractive':
-                print("Экстрактивный метод...")
-                output_text = extractive_summarizer.summarize(input_text, length_param)
+            # Получаем модель из кэша
+            summarizer = get_model(model)
 
+            if not summarizer:
+                return Response(
+                    {'error': f'Модель {model} не найдена'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-
-            elif summary_type == 'abstractive':
-
-                print("Абстрактивный метод...")
-
-                print("Получаем суммаризатор...")
-
-                summ = get_abstractive_summarizer()
-
-                print(f"Суммаризатор получен: {summ}")
-
-                if summ:
-
-                    try:
-
-                        print("Вызываем summarize...")
-
-                        output_text = summ.summarize(
-
-                            input_text,
-
-                            max_length=length_param * 20,
-
-                            min_length=length_param * 10
-
-                        )
-
-                        print("Суммаризация выполнена")
-
-                    except Exception as e:
-
-                        print(f"Ошибка при вызове summarize: {e}")
-
-                        output_text = f"Ошибка: {e}"
-
+            if model.startswith('extractive'):
+                if isinstance(length_param, dict):
+                    sentences_count = 5
                 else:
+                    sentences_count = int(length_param)
 
-                    output_text = "Абстрактивная модель не загрузилась. Попробуй позже."
+                output_text = summarizer.summarize(input_text, sentences_count)
+                length_value = sentences_count
+
+            else:
+                if isinstance(length_param, dict):
+                    min_words = int(length_param.get('min', 50))
+                    max_words = int(length_param.get('max', 150))
+                else:
+                    max_words = int(length_param) * 20
+                    min_words = max_words // 2
+
+                output_text = summarizer.summarize(
+                    input_text,
+                    max_length=max_words,
+                    min_length=min_words
+                )
+                length_value = max_words
 
         except Exception as e:
             print(f"ОШИБКА: {str(e)}")
-            output_text = f"Ошибка: {str(e)}"
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Ошибка: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         processing_time = time.time() - start_time
-        print(f"Время обработки: {processing_time} сек")
 
         data = {
             'input_text': input_text,
             'output_text': output_text,
-            'summary_type': summary_type,
-            'length_param': length_param,
+            'summary_type': 'extractive' if model.startswith('extractive') else 'abstractive',
+            'model_name': model,
+            'length_param': length_value,
             'processing_time': processing_time
         }
 
         serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(
+                {'errors': serializer.errors, 'data': data},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         self.perform_create(serializer)
 
+        print(f"Сохранено, ID: {serializer.data.get('id')}")
+        print(f"Время обработки: {processing_time} сек")
         print("=== ЗАПРОС ОБРАБОТАН ===")
+
         return Response(serializer.data)
 
 
@@ -326,3 +387,5 @@ def files_view(request):
 def request_detail_view(request, pk):
     req = get_object_or_404(SummaryRequest, pk=pk, user=request.user)
     return render(request, 'api/request_detail.html', {'request': req})
+
+load_all_models()

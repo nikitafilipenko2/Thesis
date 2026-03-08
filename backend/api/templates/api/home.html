@@ -48,21 +48,50 @@
                         </div>
                     </div>
                     
-                    <!-- Параметры суммаризации -->
+                    <!-- Выбор модели -->
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="summaryType" class="form-label">Тип суммаризации</label>
-                            <select class="form-select" id="summaryType">
-                                <option value="extractive">Экстрактивная (выделение предложений)</option>
-                                <option value="abstractive">Абстрактивная (нейросеть)</option>
+                        <div class="col-md-12">
+                            <label class="form-label">Модель суммаризации</label>
+                            <select class="form-select" id="modelSelect">
+                                <optgroup label="Экстрактивные (выделение предложений)">
+                                    <option value="extractive_textrank" selected>TextRank (баланс скорости и качества)</option>
+                                    <option value="extractive_lsa">LSA (тематическое моделирование)</option>
+                                    <option value="extractive_lexrank">LexRank (графовый метод)</option>
+                                </optgroup>
+                                <optgroup label="Абстрактивные (нейросети)">
+                                    <option value="abstractive_mbart">mBART (русская, 5 ГБ)</option>
+                                    <option value="abstractive_rut5">ruT5 (русская, 1.5 ГБ)</option>
+                                    <option value="abstractive_cointegrated">cointegrated/rut5-base-absum (легкая, 500 МБ)</option>
+                                </optgroup>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label for="lengthParam" class="form-label">Длина результата: <span id="lengthValue">3</span> предл.</label>
-                            <input type="range" class="form-range" id="lengthParam" min="1" max="10" value="3">
+                    </div>
+
+                    <!-- Параметры длины (динамически меняются) -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div id="extractiveParams">
+                                <label class="form-label">Количество предложений: <span id="sentenceCount">5</span></label>
+                                <input type="range" class="form-range" id="sentenceSlider" min="1" max="20" value="5">
+                                <div class="form-text">Сколько предложений оставить в реферате</div>
+                            </div>
+
+                            <div id="abstractiveParams" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Минимум слов: <span id="minWords">50</span></label>
+                                        <input type="range" class="form-range" id="minWordsSlider" min="20" max="200" value="50" step="10">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Максимум слов: <span id="maxWords">150</span></label>
+                                        <input type="range" class="form-range" id="maxWordsSlider" min="50" max="500" value="150" step="10">
+                                    </div>
+                                </div>
+                                <div class="form-text">Диапазон длины реферата в словах</div>
+                            </div>
                         </div>
                     </div>
-                    
+
                     <!-- Кнопка отправки -->
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
@@ -70,7 +99,7 @@
                         </button>
                     </div>
                 </form>
-                
+
                 <!-- Индикатор загрузки -->
                 <div id="loading" class="text-center my-4 d-none">
                     <div class="spinner-border text-primary" role="status">
@@ -78,17 +107,22 @@
                     </div>
                     <p class="mt-2">Обработка запроса...</p>
                 </div>
-                
+
                 <!-- Результат -->
                 <div id="resultSection" class="mt-4 d-none">
                     <hr>
                     <h5>Результат:</h5>
                     <div class="result-box" id="resultText"></div>
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-outline-primary" id="copyBtn">
-                            <i class="bi bi-clipboard"></i> Копировать
-                        </button>
-                        <span class="text-muted ms-2" id="processingTime"></span>
+                    <div class="mt-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" id="copyBtn">
+                                <i class="bi bi-clipboard"></i> Копировать
+                            </button>
+                            <span class="text-muted ms-2" id="processingTime"></span>
+                        </div>
+                        <div>
+                            <span class="badge bg-info" id="stats"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -98,38 +132,65 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const lengthSlider = document.getElementById('lengthParam');
-    const lengthValue = document.getElementById('lengthValue');
-    
-    lengthSlider.addEventListener('input', function() {
-        lengthValue.textContent = this.value;
+    // Переключение между экстрактивными и абстрактивными параметрами
+    const modelSelect = document.getElementById('modelSelect');
+    const extractiveParams = document.getElementById('extractiveParams');
+    const abstractiveParams = document.getElementById('abstractiveParams');
+
+    modelSelect.addEventListener('change', function() {
+        const model = this.value;
+        if (model.startsWith('extractive')) {
+            extractiveParams.style.display = 'block';
+            abstractiveParams.style.display = 'none';
+        } else {
+            extractiveParams.style.display = 'none';
+            abstractiveParams.style.display = 'block';
+        }
     });
-    
+
+    // Слайдеры
+    const sentenceSlider = document.getElementById('sentenceSlider');
+    const sentenceCount = document.getElementById('sentenceCount');
+    sentenceSlider.addEventListener('input', function() {
+        sentenceCount.textContent = this.value;
+    });
+
+    const minWordsSlider = document.getElementById('minWordsSlider');
+    const minWords = document.getElementById('minWords');
+    minWordsSlider.addEventListener('input', function() {
+        minWords.textContent = this.value;
+    });
+
+    const maxWordsSlider = document.getElementById('maxWordsSlider');
+    const maxWords = document.getElementById('maxWords');
+    maxWordsSlider.addEventListener('input', function() {
+        maxWords.textContent = this.value;
+    });
+
     // Загрузка файла
     document.getElementById('fileInput').addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (!file) return;
-        
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-        
+
         document.getElementById('loading').classList.remove('d-none');
-        
+
         try {
             const response = await fetch('/api/files/upload/', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 document.getElementById('fileInfo').textContent = `Файл загружен: ${data.original_filename} (${data.extracted_text.length} символов)`;
                 document.getElementById('fileInfo').classList.remove('d-none', 'alert-danger');
                 document.getElementById('fileInfo').classList.add('alert-success');
-                
-                // Переключаемся на вкладку с текстом и вставляем извлеченный текст
+
                 document.getElementById('text-tab').click();
                 document.getElementById('inputText').value = data.extracted_text;
             } else {
@@ -145,31 +206,47 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('loading').classList.add('d-none');
         }
     });
-    
+
     // Отправка на суммаризацию
     document.getElementById('summarizeForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const text = document.getElementById('inputText').value.trim();
         if (!text) {
             alert('Введите текст или загрузите файл');
             return;
         }
-        
+
         const submitBtn = document.getElementById('submitBtn');
         const loading = document.getElementById('loading');
         const resultSection = document.getElementById('resultSection');
-        
+
         submitBtn.disabled = true;
         loading.classList.remove('d-none');
         resultSection.classList.add('d-none');
-        
-        const data = {
+
+        // Собираем параметры
+        const model = document.getElementById('modelSelect').value;
+
+        let lengthParam;
+        if (model.startsWith('extractive')) {
+            lengthParam = parseInt(document.getElementById('sentenceSlider').value);
+        } else {
+            // Для абстрактивных передаем объект с min/max
+            lengthParam = {
+                min: parseInt(document.getElementById('minWordsSlider').value),
+                max: parseInt(document.getElementById('maxWordsSlider').value)
+            };
+        }
+
+        const requestData = {
             input_text: text,
-            summary_type: document.getElementById('summaryType').value,
-            length_param: parseInt(document.getElementById('lengthParam').value)
+            model: model,
+            length_param: lengthParam
         };
-        
+
+        console.log('Отправляем:', requestData);
+
         try {
             const response = await fetch('/api/requests/summarize/', {
                 method: 'POST',
@@ -177,19 +254,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(requestData)
             });
-            
+
             const result = await response.json();
-            
+
             if (response.ok) {
                 document.getElementById('resultText').innerHTML = result.output_text.replace(/\n/g, '<br>');
                 document.getElementById('processingTime').textContent = `Время: ${result.processing_time.toFixed(2)} сек`;
+
+                // Считаем статистику
+                const words = result.output_text.split(/\s+/).length;
+                const sentences = result.output_text.split(/[.!?]+/).length - 1;
+                document.getElementById('stats').textContent = `Слов: ${words}, предложений: ${sentences}`;
+
                 resultSection.classList.remove('d-none');
             } else {
                 alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
             }
         } catch (error) {
+            console.error('Ошибка:', error);
             alert('Ошибка при отправке запроса');
         } finally {
             submitBtn.disabled = false;

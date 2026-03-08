@@ -14,6 +14,7 @@ class SummaryRequest(models.Model):
     length_param = models.IntegerField(default=5, verbose_name='Параметр длины')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     processing_time = models.FloatField(null=True, blank=True, verbose_name='Время обработки (сек)')
+    model_name = models.CharField(max_length=100, blank=True, verbose_name='Название модели')
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Запрос на реферирование'
