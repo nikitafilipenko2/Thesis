@@ -1,76 +1,54 @@
-from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .models import SummaryRequest
-from .serializers import SummaryRequestSerializer
-from .summarization import ExtractiveSummarizer
-import time
+from django.contrib import admin
+from .models import SummaryRequest, UploadedFile
 
-summarizer = ExtractiveSummarizer(method='textrank')
 
-class SummaryRequestViewSet(viewsets.ModelViewSet):
-    serializer_class = SummaryRequestSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    queryset = SummaryRequest.objects.all()
+@admin.register(SummaryRequest)
+class SummaryRequestAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'summary_type', 'created_at', 'processing_time', 'short_input', 'short_output')
+    list_filter = ('summary_type', 'created_at')
+    search_fields = ('user__username', 'input_text', 'output_text')
+    readonly_fields = ('input_text', 'output_text', 'created_at', 'processing_time')
 
-    def get_queryset(self):
-        return SummaryRequest.objects.filter(user=self.request.user)
+    def short_input(self, obj):
+        return obj.input_text[:50] + '...' if len(obj.input_text) > 50 else obj.input_text
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    short_input.short_description = 'Исходный текст'
 
-    @action(detail=False, methods=['post'])
-    def summarize(self, request):
-        print("=== МЕТОД SUMMARIZE ВЫЗВАН ===")
+    def short_output(self, obj):
+        return obj.output_text[:50] + '...' if len(obj.output_text) > 50 else obj.output_text
 
-        input_text = request.data.get('input_text', '')
-        summary_type = request.data.get('summary_type', 'extractive')
-        length_param = int(request.data.get('length_param', 5))
+    short_output.short_description = 'Реферат'
 
-        print(f"Параметры: тип={summary_type}, длина={length_param}")
-        print(f"Длина текста: {len(input_text)} символов")
+    fieldsets = (
+        ('Пользователь', {
+            'fields': ('user',)
+        }),
+        ('Параметры', {
+            'fields': ('summary_type', 'length_param', 'processing_time', 'created_at')
+        }),
+        ('Тексты', {
+            'fields': ('input_text', 'output_text'),
+            'classes': ('wide',)
+        }),
+    )
 
-        if not input_text:
-            return Response(
-                {'error': 'Текст не может быть пустым'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
-        start_time = time.time()
+@admin.register(UploadedFile)
+class UploadedFileAdmin(admin.ModelAdmin):
+    list_display = ('id', 'original_filename', 'user', 'file_type', 'file_size', 'uploaded_at')
+    list_filter = ('file_type', 'uploaded_at')
+    search_fields = ('original_filename', 'user__username')
+    readonly_fields = ('extracted_text',)
 
-        if summary_type == 'extractive':
-            try:
-                print("Пытаюсь сделать суммаризацию...")
-                output_text = summarizer.summarize(input_text, length_param)
-                print(f"Суммаризация успешна, длина результата: {len(output_text)}")
-
-                if len(output_text) == len(input_text):
-                    print("ВНИМАНИЕ: Результат совпадает с исходным текстом!")
-                    print("Пробуем другой метод...")
-                    alt_summarizer = ExtractiveSummarizer(method='lsa')
-                    output_text = alt_summarizer.summarize(input_text, length_param)
-                    print(f"Альтернативный метод, длина результата: {len(output_text)}")
-
-            except Exception as e:
-                print(f"ОШИБКА при суммаризации: {str(e)}")
-                output_text = f"Ошибка: {str(e)}"
-        else:
-            output_text = "Абстрактивный метод будет добавлен позже"
-
-        processing_time = time.time() - start_time
-        print(f"Время обработки: {processing_time} сек")
-
-        data = {
-            'input_text': input_text,
-            'output_text': output_text,
-            'summary_type': summary_type,
-            'length_param': length_param,
-            'processing_time': processing_time
-        }
-
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-
-        print("=== ЗАПРОС ОБРАБОТАН ===")
-        return Response(serializer.data)
+    fieldsets = (
+        ('Пользователь', {
+            'fields': ('user',)
+        }),
+        ('Информация о файле', {
+            'fields': ('original_filename', 'file_type', 'file_size', 'uploaded_at')
+        }),
+        ('Извлеченный текст', {
+            'fields': ('extracted_text',),
+            'classes': ('wide',)
+        }),
+    )

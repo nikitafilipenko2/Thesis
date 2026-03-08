@@ -6,6 +6,11 @@ from .serializers import SummaryRequestSerializer
 from .summarization import ExtractiveSummarizer
 import time
 from .abstractive import AbstractiveSummarizer
+from .models import UploadedFile
+from .serializers import UploadedFileSerializer
+from .file_processor import FileProcessor
+import tempfile
+import os
 
 extractive_summarizer = ExtractiveSummarizer(method='textrank')
 abstractive_summarizer = None  # Пока не загружаем
@@ -119,3 +124,131 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
         print("=== ЗАПРОС ОБРАБОТАН ===")
         return Response(serializer.data)
+
+
+class FileUploadViewSet(viewsets.ModelViewSet):
+    serializer_class = UploadedFileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = UploadedFile.objects.all()
+
+    def get_queryset(self):
+        return UploadedFile.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def upload(self, request):
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response(
+                {'error': 'Файл не выбран'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверка размера (макс 10 МБ)
+        if uploaded_file.size > 10 * 1024 * 1024:
+            return Response(
+                {'error': 'Файл слишком большой (макс 10 МБ)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Определяем тип файла
+        filename = uploaded_file.name
+        if filename.endswith('.txt'):
+            file_type = 'txt'
+        elif filename.endswith('.pdf'):
+            file_type = 'pdf'
+        elif filename.endswith('.docx'):
+            file_type = 'docx'
+        else:
+            return Response(
+                {'error': 'Поддерживаются только .txt, .pdf, .docx'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Сохраняем временно файл
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp:
+            for chunk in uploaded_file.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        try:
+            # Извлекаем текст
+            extracted_text = FileProcessor.extract_text(tmp_path)
+
+            # Создаем запись в БД
+            data = {
+                'original_filename': filename,
+                'file_size': uploaded_file.size,
+                'file_type': file_type,
+                'extracted_text': extracted_text
+            }
+
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        finally:
+            # Удаляем временный файл
+            os.unlink(tmp_path)
+
+    @action(detail=True, methods=['post'])
+    def summarize(self, request, pk=None):
+        file_record = self.get_object()
+
+        if not file_record.extracted_text:
+            return Response(
+                {'error': 'Не удалось извлечь текст из файла'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        summary_type = request.data.get('summary_type', 'extractive')
+        length_param = int(request.data.get('length_param', 5))
+
+        start_time = time.time()
+
+        if summary_type == 'extractive':
+            output_text = extractive_summarizer.summarize(
+                file_record.extracted_text,
+                length_param
+            )
+        elif summary_type == 'abstractive':
+            summ = get_abstractive_summarizer()
+            if summ:
+                output_text = summ.summarize(
+                    file_record.extracted_text,
+                    max_length=length_param * 20,
+                    min_length=length_param * 10
+                )
+            else:
+                output_text = "Абстрактивная модель не загружена"
+        else:
+            output_text = "Неизвестный тип суммаризации"
+
+        processing_time = time.time() - start_time
+
+        # Сохраняем результат как обычный запрос
+        summary_data = {
+            'input_text': file_record.extracted_text[:500] + "...",
+            'output_text': output_text,
+            'summary_type': summary_type,
+            'length_param': length_param,
+            'processing_time': processing_time
+        }
+
+        summary_serializer = SummaryRequestSerializer(data=summary_data)
+        summary_serializer.is_valid(raise_exception=True)
+        summary_serializer.save(user=request.user)
+
+        return Response({
+            'file': serializer.data,
+            'summary': summary_serializer.data
+        })

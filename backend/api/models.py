@@ -20,3 +20,19 @@ class SummaryRequest(models.Model):
         verbose_name_plural = 'Запросы на реферирование'
     def __str__(self):
         return f"Запрос #{self.id} от {self.created_at.strftime('%d.%m.%Y %H:%M')}"
+
+
+class UploadedFile(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploaded_files')
+    file = models.FileField(upload_to='uploads/')
+    original_filename = models.CharField(max_length=255)
+    file_size = models.IntegerField()  # в байтах
+    file_type = models.CharField(max_length=50)  # pdf, docx, txt
+    extracted_text = models.TextField(blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.user.username})"
