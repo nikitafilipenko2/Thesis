@@ -135,6 +135,6 @@ REST_FRAMEWORK = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-import sys
-print("Python path:", sys.path)
-print("TEMPLATES settings:", TEMPLATES)
+LOGIN_URL = '/login/'  # именно так, с / в начале
+LOGIN_REDIRECT_URL = '/'  # куда отправлять после успешного логина
+LOGOUT_REDIRECT_URL = '/login/'  # куда после выхода
