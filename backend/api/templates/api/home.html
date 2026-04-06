@@ -2,6 +2,24 @@
 
 {% block title %}Главная{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Стили для вкладок — делаем текст всегда черным */
+    .nav-tabs .nav-link {
+        color: #000000 !important;
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #000000 !important;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #000000 !important;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-10">
@@ -16,12 +34,12 @@
                     <!-- Выбор режима ввода -->
                     <ul class="nav nav-tabs mb-3" id="inputTab" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">
+                            <button class="nav-link active text-dark" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">
                                 <i class="bi bi-text-paragraph"></i> Текст
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab">
+                            <button class="nav-link text-dark" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab">
                                 <i class="bi bi-file-earmark"></i> Файл
                             </button>
                         </li>
