@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'api',
     'users',
+    'django_extensions'
 ]
 
 MIDDLEWARE = [
@@ -138,3 +139,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 LOGIN_URL = '/login/'  # именно так, с / в начале
 LOGIN_REDIRECT_URL = '/'  # куда отправлять после успешного логина
 LOGOUT_REDIRECT_URL = '/login/'  # куда после выхода
+
+GRAPH_MODELS = {
+  'all_applications': True,
+  'group_models': True,
+}
