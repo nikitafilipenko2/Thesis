@@ -1,91 +1,102 @@
 {% extends 'api/base.html' %}
+{% load static %}
 
 {% block title %}Мои файлы{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header bg-primary text-white">
-        <h4 class="mb-0"><i class="bi bi-files"></i> Загруженные файлы</h4>
-    </div>
-    <div class="card-body">
-        {% if files %}
-            <div class="row">
-                {% for file in files %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <h5 class="card-title">
-                                            <i class="bi bi-file-earmark-{{ file.file_type }}"></i>
-                                            {{ file.original_filename }}
-                                        </h5>
-                                        <p class="card-text">
-                                            <small class="text-muted">
-                                                {{ file.file_type|upper }}, {{ file.file_size|filesizeformat }}
-                                                <br>
-                                                Загружен: {{ file.uploaded_at|date:"d.m.Y H:i" }}
-                                            </small>
-                                        </p>
-                                        {% if file.extracted_text %}
+<div x-data="filesPage()">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="bi bi-files"></i> Загруженные файлы</h4>
+        </div>
+        <div class="card-body">
+            {% if files %}
+                <div class="row">
+                    {% for file in files %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h5 class="card-title">
+                                                <i class="bi bi-file-earmark-{{ file.file_type }}"></i>
+                                                {{ file.original_filename }}
+                                            </h5>
                                             <p class="card-text">
-                                                <strong>Текст:</strong> 
-                                                {{ file.extracted_text|truncatechars:100 }}
+                                                <small class="text-muted">
+                                                    {{ file.file_type|upper }}, {{ file.file_size|filesizeformat }}
+                                                    <br>
+                                                    Загружен: {{ file.uploaded_at|date:"d.m.Y H:i" }}
+                                                </small>
                                             </p>
-                                        {% endif %}
+                                            {% if file.extracted_text %}
+                                                <p class="card-text">
+                                                    <strong>Текст:</strong>
+                                                    {{ file.extracted_text|truncatechars:100 }}
+                                                </p>
+                                            {% endif %}
+                                        </div>
+                                        <span class="badge bg-secondary">{{ file.id }}</span>
                                     </div>
-                                    <span class="badge bg-secondary">{{ file.id }}</span>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-sm btn-primary" @click="openDialog({{ file.id }})">
+                                        <i class="bi bi-magic"></i> Суммаризировать
+                                    </button>
                                 </div>
                             </div>
-                            <div class="card-footer">
-                                <button class="btn btn-sm btn-primary" onclick="summarizeFile({{ file.id }})">
-                                    <i class="bi bi-magic"></i> Суммаризировать
-                                </button>
-                            </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-center text-muted my-4">У вас пока нет загруженных файлов</p>
+                <div class="text-center">
+                    <a href="/" class="btn btn-primary">Загрузить файл</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="modal-backdrop-custom" x-cloak x-show="dialogOpen" x-transition.opacity @click.self="closeDialog()">
+        <div class="summary-dialog" x-show="dialogOpen" x-transition>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Суммаризация файла</h5>
+                <button type="button" class="btn-close" @click="closeDialog()"></button>
             </div>
-        {% else %}
-            <p class="text-center text-muted my-4">У вас пока нет загруженных файлов</p>
-            <div class="text-center">
-                <a href="/" class="btn btn-primary">Загрузить файл</a>
-            </div>
-        {% endif %}
+            <form :hx-post="submitUrl"
+                  hx-target="#file-summary-feedback"
+                  hx-swap="innerHTML"
+                  @htmx:before-request="loading = true"
+                  @htmx:after-request="loading = false">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Тип суммаризации</label>
+                    <select class="form-select" name="summary_type" x-model="summaryType">
+                        <option value="extractive">Экстрактивная</option>
+                        <option value="abstractive">Абстрактивная</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Параметр длины</label>
+                    <input class="form-control" type="number" name="length_param" min="1" max="20" x-model="lengthParam">
+                </div>
+                <div id="file-summary-feedback" class="mb-3"></div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" @click="closeDialog()">Отмена</button>
+                    <button type="submit" class="btn btn-primary" :disabled="loading || !activeFileId">
+                        <span x-show="!loading">Запустить</span>
+                        <span x-show="loading">
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            Обработка...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
+{% endblock %}
 
-<script>
-function summarizeFile(fileId) {
-    const length = prompt('Введите количество предложений (1-10):', '3');
-    if (!length) return;
-    
-    const type = confirm('Нажмите OK для абстрактивной суммаризации, Отмена для экстрактивной');
-    const summaryType = type ? 'abstractive' : 'extractive';
-    
-    fetch(`/api/files/${fileId}/summarize/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: JSON.stringify({
-            summary_type: summaryType,
-            length_param: parseInt(length)
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.summary) {
-            alert('Суммаризация выполнена! Результат сохранен в историю.');
-            window.location.href = '/history/';
-        } else {
-            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-        }
-    })
-    .catch(error => {
-        alert('Ошибка при выполнении запроса');
-    });
-}
-</script>
+{% block extra_js %}
+<script src="{% static 'js/files.js' %}"></script>
 {% endblock %}

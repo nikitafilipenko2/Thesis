@@ -1,4 +1,5 @@
 {% extends 'api/base.html' %}
+{% load static %}
 
 {% block title %}Главная{% endblock %}
 
@@ -12,8 +13,6 @@
             <div class="card-body">
                 <div x-data="summarizerApp()" x-init="init()">
                     {% csrf_token %}
-
-                    <!-- Вкладки -->
                     <ul class="nav nav-tabs mb-3">
                         <li class="nav-item">
                             <button class="nav-link" :class="{'active': tab === 'text'}" @click="tab = 'text'" type="button">
@@ -27,7 +26,6 @@
                         </li>
                     </ul>
 
-                    <!-- Вкладка Текст -->
                     <div x-show="tab === 'text'" x-transition>
                         <div class="mb-3">
                             <label class="form-label">Введите текст</label>
@@ -39,7 +37,6 @@
                         </div>
                     </div>
 
-                    <!-- Вкладка Файл -->
                     <div x-show="tab === 'file'" x-transition>
                         <div class="mb-3">
                             <label class="form-label">Выберите файл</label>
@@ -52,7 +49,6 @@
                         <div x-show="fileInfo" x-text="fileInfo" class="alert" :class="fileInfoClass"></div>
                     </div>
 
-                    <!-- Выбор модели -->
                     <div class="row mb-3 mt-3">
                         <div class="col-md-12">
                             <label class="form-label">Модель суммаризации</label>
@@ -71,7 +67,6 @@
                         </div>
                     </div>
 
-                    <!-- Параметры экстрактивные -->
                     <div x-show="isExtractive" x-transition class="row mb-3">
                         <div class="col-md-12">
                             <label class="form-label">Количество предложений: <span x-text="sentenceCount"></span></label>
@@ -85,7 +80,6 @@
                         </div>
                     </div>
 
-                    <!-- Параметры абстрактивные -->
                     <div x-show="!isExtractive" x-transition class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Минимум слов: <span x-text="minWords"></span></label>
@@ -97,10 +91,9 @@
                         </div>
                     </div>
 
-                    <!-- Кнопка отправки -->
                     <div class="d-grid">
                         <button type="button" class="btn btn-primary btn-lg" @click="summarize" :disabled="loading">
-                            <span x-show="!loading">✨ Суммаризировать</span>
+                            <span x-show="!loading">Суммаризировать</span>
                             <span x-show="loading">
                                 <span class="spinner-border spinner-border-sm me-2"></span>
                                 Обработка...
@@ -108,11 +101,10 @@
                         </button>
                     </div>
 
-                    <!-- Результат -->
                     <div x-show="result" x-transition class="mt-4">
                         <hr>
                         <h5>Результат:</h5>
-                        <div class="result-box" x-html="resultHtml"></div>
+                        <div class="result-box" x-text="result"></div>
                         <div class="mt-2 d-flex justify-content-between">
                             <button class="btn btn-sm btn-outline-primary" @click="copyResult">
                                 <i class="bi bi-clipboard"></i> Копировать
@@ -126,6 +118,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<script src="/static/js/home.js"></script>
+{% block extra_js %}
+<script src="{% static 'js/home.js' %}"></script>
 {% endblock %}

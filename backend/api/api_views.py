@@ -25,19 +25,13 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def summarize(self, request):
-        print("=== Р РњР•РўР Р” SUMMARIZE Р вЂ™Р В«Р вЂ”Р вЂ™Р С’Р Сњ ===")
-
         input_text = request.data.get('input_text', '')
         model = request.data.get('model', 'extractive_textrank')
         length_param = request.data.get('length_param', 5)
 
-        print(f"Р СљР С•Р Т‘Р ВµР В»РЎРЉ: {model}")
-        print(f"Р СџР В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚РЎвЂ№ Р Т‘Р В»Р С‘Р Р…РЎвЂ№: {length_param}")
-        print(f"Р вЂќР В»Р С‘Р Р…Р В° РЎвЂљР ВµР С”РЎРѓРЎвЂљР В°: {len(input_text)} РЎРѓР С‘Р СР Р†Р С•Р В»Р С•Р Р†")
-
         if not input_text:
             return Response(
-                {'error': 'Р СћР ВµР С”РЎРѓРЎвЂљ Р Р…Р Вµ Р СР С•Р В¶Р ВµРЎвЂљ Р В±РЎвЂ№РЎвЂљРЎРЉ Р С—РЎС“РЎРѓРЎвЂљРЎвЂ№Р С'},
+                {'error': 'Текст не может быть пустым'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -48,7 +42,7 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
             if not summarizer:
                 return Response(
-                    {'error': f'Р СљР С•Р Т‘Р ВµР В»РЎРЉ {model} Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…Р В°'},
+                    {'error': f'Модель {model} не найдена'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -60,7 +54,6 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
                 output_text = summarizer.summarize(input_text, sentences_count)
                 length_value = sentences_count
-
             else:
                 if isinstance(length_param, dict):
                     min_words = int(length_param.get('min', 50))
@@ -75,13 +68,9 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
                     min_length=min_words
                 )
                 length_value = max_words
-
         except Exception as e:
-            print(f"Р С›Р РЃР ВР вЂР С™Р С’: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response(
-                {'error': f'Р С›РЎв‚¬Р С‘Р В±Р С”Р В°: {str(e)}'},
+                {'error': f'Ошибка: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -104,11 +93,6 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
             )
 
         self.perform_create(serializer)
-
-        print(f"Р РЋР С•РЎвЂ¦РЎР‚Р В°Р Р…Р ВµР Р…Р С•, ID: {serializer.data.get('id')}")
-        print(f"Р вЂ™РЎР‚Р ВµР СРЎРЏ Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р С‘: {processing_time} РЎРѓР ВµР С”")
-        print("=== Р вЂ”Р С’Р СџР В Р С›Р РЋ Р С›Р вЂР В Р С’Р вЂР С›Р СћР С’Р Сњ ===")
-
         return Response(serializer.data)
 
 
@@ -128,26 +112,42 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
             return Response(
-                {'error': 'Р В¤Р В°Р в„–Р В» Р Р…Р Вµ Р Р†РЎвЂ№Р В±РЎР‚Р В°Р Р…'},
+                {'error': 'Файл не выбран'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if uploaded_file.size > 10 * 1024 * 1024:
             return Response(
-                {'error': 'Р В¤Р В°Р в„–Р В» РЎРѓР В»Р С‘РЎв‚¬Р С”Р С•Р С Р В±Р С•Р В»РЎРЉРЎв‚¬Р С•Р в„– (Р СР В°Р С”РЎРѓ 10 Р СљР вЂ)'},
+                {'error': 'Файл слишком большой (макс 10 МБ)'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         filename = uploaded_file.name
-        if filename.endswith('.txt'):
+        normalized_filename = filename.lower()
+        allowed_content_types = {
+            'txt': {'text/plain', 'application/octet-stream'},
+            'pdf': {'application/pdf', 'application/octet-stream'},
+            'docx': {
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/octet-stream',
+            },
+        }
+
+        if normalized_filename.endswith('.txt'):
             file_type = 'txt'
-        elif filename.endswith('.pdf'):
+        elif normalized_filename.endswith('.pdf'):
             file_type = 'pdf'
-        elif filename.endswith('.docx'):
+        elif normalized_filename.endswith('.docx'):
             file_type = 'docx'
         else:
             return Response(
-                {'error': 'Р СџР С•Р Т‘Р Т‘Р ВµРЎР‚Р В¶Р С‘Р Р†Р В°РЎР‹РЎвЂљРЎРѓРЎРЏ РЎвЂљР С•Р В»РЎРЉР С”Р С• .txt, .pdf, .docx'},
+                {'error': 'Поддерживаются только .txt, .pdf, .docx'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if uploaded_file.content_type not in allowed_content_types[file_type]:
+            return Response(
+                {'error': 'Неверный тип файла'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -159,6 +159,12 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         try:
             extracted_text = FileProcessor.extract_text(tmp_path)
 
+            if not extracted_text or not extracted_text.strip():
+                return Response(
+                    {'error': 'Из файла не удалось извлечь текст'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             data = {
                 'original_filename': filename,
                 'file_size': uploaded_file.size,
@@ -169,9 +175,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
-
             return Response(serializer.data)
-
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -186,7 +190,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
         if not file_record.extracted_text:
             return Response(
-                {'error': 'Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р С‘Р В·Р Р†Р В»Р ВµРЎвЂЎРЎРЉ РЎвЂљР ВµР С”РЎРѓРЎвЂљ Р С‘Р В· РЎвЂћР В°Р в„–Р В»Р В°'},
+                {'error': 'Не удалось извлечь текст из файла'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -212,10 +216,10 @@ class FileUploadViewSet(viewsets.ModelViewSet):
                     min_length=length_param * 10
                 )
             else:
-                output_text = "Р С’Р В±РЎРѓРЎвЂљРЎР‚Р В°Р С”РЎвЂљР С‘Р Р†Р Р…Р В°РЎРЏ Р СР С•Р Т‘Р ВµР В»РЎРЉ Р Р…Р Вµ Р В·Р В°Р С–РЎР‚РЎС“Р В¶Р ВµР Р…Р В°"
+                output_text = 'Абстрактивная модель не загружена'
         else:
             model_name = ''
-            output_text = "Р СњР ВµР С‘Р В·Р Р†Р ВµРЎРѓРЎвЂљР Р…РЎвЂ№Р в„– РЎвЂљР С‘Р С— РЎРѓРЎС“Р СР СР В°РЎР‚Р С‘Р В·Р В°РЎвЂ Р С‘Р С‘"
+            output_text = 'Неизвестный тип суммаризации'
 
         processing_time = time.time() - start_time
 

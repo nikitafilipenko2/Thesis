@@ -19,10 +19,6 @@ function summarizerApp() {
             return this.model.startsWith('extractive');
         },
 
-        get resultHtml() {
-            return this.result.replace(/\n/g, '<br>');
-        },
-
         get totalSentences() {
             return countSentences(this.text);
         },
