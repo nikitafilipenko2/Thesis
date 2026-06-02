@@ -16,7 +16,6 @@
             </div>
             <div class="card-body">
                 <div x-data="summarizerApp()" x-init="init()">
-                    {% csrf_token %}
                     <ul class="nav nav-tabs mb-3">
                         <li class="nav-item">
                             <button class="nav-link" :class="{'active': tab === 'text'}" @click="tab = 'text'" type="button">
@@ -33,41 +32,49 @@
                     <div x-show="tab === 'text'" x-transition>
                         <div class="mb-3">
                             <label class="form-label">Введите текст</label>
-                            <textarea class="form-control"
-                                      x-model="text"
-                                      @input="analyzeAndUpdateSliders()"
-                                      rows="8"
-                                      placeholder="Вставьте текст для суммаризации..."></textarea>
+                            <textarea
+                                class="form-control"
+                                x-model="text"
+                                @input="analyzeAndUpdateSliders()"
+                                rows="8"
+                                placeholder="Вставьте текст для суммаризации..."
+                            ></textarea>
                         </div>
                     </div>
 
                     <div x-show="tab === 'file'" x-transition>
-                        <form hx-post="/upload/"
-                              hx-encoding="multipart/form-data"
-                              hx-target="#home-upload-feedback"
-                              hx-swap="innerHTML"
-                              @htmx:before-request="loading = true"
-                              @htmx:after-request="loading = false">
+                        <form
+                            hx-post="/upload/"
+                            hx-encoding="multipart/form-data"
+                            hx-target="#home-upload-feedback"
+                            hx-swap="innerHTML"
+                            @htmx:before-request="loading = true"
+                            @htmx:after-request="loading = false"
+                        >
                             {% csrf_token %}
                             <div class="mb-3">
                                 <label class="form-label">Выберите файл</label>
-                                <input id="home-file-input"
-                                       type="file"
-                                       name="file"
-                                       class="form-control"
-                                       accept=".txt,.pdf,.docx"
-                                       @change="$el.form.requestSubmit()">
-                                <div class="form-text">Поддерживаются .txt, .pdf, .docx (макс 10 МБ)</div>
+                                <input
+                                    id="home-file-input"
+                                    type="file"
+                                    name="file"
+                                    class="form-control"
+                                    accept=".txt,.pdf,.docx"
+                                    @change="$el.form.requestSubmit()"
+                                >
+                                <div class="form-text">Поддерживаются .txt, .pdf и .docx файлы размером до 10 МБ</div>
                             </div>
                         </form>
                         <div id="home-upload-feedback" class="mb-3"></div>
                     </div>
 
-                    <form hx-post="/summarize/"
-                          hx-target="#home-summary-result"
-                          hx-swap="innerHTML"
-                          @htmx:before-request="loading = true"
-                          @htmx:after-request="loading = false">
+                    <form
+                        hx-post="/summarize/"
+                        hx-target="#home-summary-result"
+                        hx-swap="innerHTML"
+                        @htmx:before-request="loading = true"
+                        @htmx:after-request="loading = false"
+                    >
                         {% csrf_token %}
                         <input type="hidden" name="input_text" :value="text">
                         <input type="hidden" name="model" :value="model">
@@ -85,9 +92,9 @@
                                         <option value="extractive_lexrank">LexRank</option>
                                     </optgroup>
                                     <optgroup label="Абстрактивные">
-                                        <option value="abstractive_cointegrated">ruT5 Base (лёгкая)</option>
-                                        <option value="abstractive_rut5">ruT5 (средняя)</option>
-                                        <option value="abstractive_mbart">mBART (тяжёлая)</option>
+                                        {% for model_name, model_config in abstractive_models %}
+                                            <option value="{{ model_name }}">{{ model_config.label }}</option>
+                                        {% endfor %}
                                     </optgroup>
                                 </select>
                             </div>
@@ -96,13 +103,15 @@
                         <div x-show="isExtractive" x-transition class="row mb-3">
                             <div class="col-md-12">
                                 <label class="form-label">Количество предложений: <span x-text="sentenceCount"></span></label>
-                                <input type="range"
-                                       class="form-range"
-                                       x-model="sentenceCount"
-                                       x-ref="sentenceSlider"
-                                       min="1"
-                                       max="20"
-                                       step="1">
+                                <input
+                                    type="range"
+                                    class="form-range"
+                                    x-model="sentenceCount"
+                                    x-ref="sentenceSlider"
+                                    min="1"
+                                    max="20"
+                                    step="1"
+                                >
                             </div>
                         </div>
 

@@ -15,6 +15,7 @@
                         <tr>
                             <th>ID</th>
                             <th>Тип</th>
+                            <th>Модель</th>
                             <th>Длина</th>
                             <th>Время</th>
                             <th>Дата</th>
@@ -25,26 +26,27 @@
                     </thead>
                     <tbody>
                         {% for req in requests %}
-                        <tr>
-                            <td>{{ req.id }}</td>
-                            <td>
-                                {% if req.summary_type == 'extractive' %}
-                                    <span class="badge bg-info">Экстрактивный</span>
-                                {% else %}
-                                    <span class="badge bg-success">Абстрактивный</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ req.length_param }}</td>
-                            <td>{{ req.processing_time|floatformat:2 }}с</td>
-                            <td>{{ req.created_at|date:"d.m.Y H:i" }}</td>
-                            <td>{{ req.input_text|truncatechars:50 }}</td>
-                            <td>{{ req.output_text|truncatechars:50 }}</td>
-                            <td>
-                                <a href="/request/{{ req.id }}/" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
+                            <tr>
+                                <td>{{ req.id }}</td>
+                                <td>
+                                    {% if req.summary_type == 'extractive' %}
+                                        <span class="badge bg-info">Экстрактивный</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Абстрактивный</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.model_name|default:"-" }}</td>
+                                <td>{{ req.length_param }}</td>
+                                <td>{{ req.processing_time|floatformat:2 }} с</td>
+                                <td>{{ req.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ req.input_text|truncatechars:50 }}</td>
+                                <td>{{ req.output_text|truncatechars:50 }}</td>
+                                <td>
+                                    <a href="/request/{{ req.id }}/" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                 </table>

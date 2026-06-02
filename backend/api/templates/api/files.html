@@ -55,7 +55,7 @@
             {% else %}
                 <p class="text-center text-muted my-4">У вас пока нет загруженных файлов</p>
                 <div class="text-center">
-                    <a href="/" class="btn btn-primary">Загрузить файл</a>
+                    <a href="/" class="btn btn-primary">Перейти к загрузке</a>
                 </div>
             {% endif %}
         </div>
@@ -67,17 +67,27 @@
                 <h5 class="mb-0">Суммаризация файла</h5>
                 <button type="button" class="btn-close" @click="closeDialog()"></button>
             </div>
-            <form :hx-post="submitUrl"
-                  hx-target="#file-summary-feedback"
-                  hx-swap="innerHTML"
-                  @htmx:before-request="loading = true"
-                  @htmx:after-request="loading = false">
+            <form
+                :hx-post="submitUrl"
+                hx-target="#file-summary-feedback"
+                hx-swap="innerHTML"
+                @htmx:before-request="loading = true"
+                @htmx:after-request="loading = false"
+            >
                 {% csrf_token %}
                 <div class="mb-3">
                     <label class="form-label">Тип суммаризации</label>
                     <select class="form-select" name="summary_type" x-model="summaryType">
                         <option value="extractive">Экстрактивная</option>
                         <option value="abstractive">Абстрактивная</option>
+                    </select>
+                </div>
+                <div class="mb-3" x-show="summaryType === 'abstractive'" x-transition>
+                    <label class="form-label">Абстрактивная модель</label>
+                    <select class="form-select" name="model_name" x-model="modelName">
+                        {% for model_name, model_config in abstractive_models %}
+                            <option value="{{ model_name }}">{{ model_config.label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="mb-3">

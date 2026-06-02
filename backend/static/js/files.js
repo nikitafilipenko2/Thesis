@@ -3,6 +3,7 @@ function filesPage() {
         dialogOpen: false,
         activeFileId: null,
         summaryType: 'extractive',
+        modelName: 'cointegrated/rut5-base-absum',
         lengthParam: 3,
         loading: false,
         get submitUrl() {
@@ -11,6 +12,7 @@ function filesPage() {
         openDialog(fileId) {
             this.activeFileId = fileId;
             this.summaryType = 'extractive';
+            this.modelName = 'cointegrated/rut5-base-absum';
             this.lengthParam = 3;
             this.loading = false;
             const feedback = document.getElementById('file-summary-feedback');

@@ -1,221 +1,169 @@
-from django.http import HttpResponse
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from .models import SummaryRequest
-from .models import UploadedFile
-from .serializers import SummaryRequestSerializer
-from .serializers import UploadedFileSerializer
-from .file_processor import FileProcessor
-from .services.model_service import get_model
 import json
-import time
-import tempfile
-import os
+
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_POST
+
+from .models import SummaryRequest, UploadedFile
+from .serializers import SummaryRequestSerializer, UploadedFileSerializer
+from .services.file_service import FileServiceError, extract_uploaded_file
+from .services.model_service import get_abstractive_model_choices
+from .services.summarization_service import (
+    SummarizationServiceError,
+    summarize_file_text,
+    summarize_text,
+)
+
+
+def _save_summary_request(user, payload):
+    serializer = SummaryRequestSerializer(
+        data={
+            "input_text": payload.input_text,
+            "output_text": payload.output_text,
+            "summary_type": payload.summary_type,
+            "model_name": payload.model_name,
+            "length_param": payload.length_param,
+            "processing_time": payload.processing_time,
+        }
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save(user=user)
+
+
+def _render_feedback(request, template_name, message, level, status=200):
+    return render(
+        request,
+        template_name,
+        {"message": message, "level": level},
+        status=status,
+    )
 
 
 @login_required
 def home_view(request):
-    return render(request, 'api/home.html')
+    return render(
+        request,
+        "api/home.html",
+        {"abstractive_models": get_abstractive_model_choices()},
+    )
 
 
 @login_required
 def history_view(request):
-    requests_list = SummaryRequest.objects.filter(user=request.user).order_by('-created_at')[:50]
-    return render(request, 'api/history.html', {'requests': requests_list})
+    requests_list = SummaryRequest.objects.filter(user=request.user).order_by("-created_at")[:50]
+    return render(request, "api/history.html", {"requests": requests_list})
 
 
 @login_required
 def files_view(request):
-    files_list = UploadedFile.objects.filter(user=request.user).order_by('-uploaded_at')
-    return render(request, 'api/files.html', {'files': files_list})
+    files_list = UploadedFile.objects.filter(user=request.user).order_by("-uploaded_at")
+    return render(
+        request,
+        "api/files.html",
+        {
+            "files": files_list,
+            "abstractive_models": get_abstractive_model_choices(),
+        },
+    )
 
 
 @login_required
 def request_detail_view(request, pk):
-    req = get_object_or_404(SummaryRequest, pk=pk, user=request.user)
-    return render(request, 'api/request_detail.html', {'request': req})
+    summary_request = get_object_or_404(SummaryRequest, pk=pk, user=request.user)
+    return render(request, "api/request_detail.html", {"request": summary_request})
 
 
 @login_required
 @require_POST
 def home_upload_view(request):
-    uploaded_file = request.FILES.get('file')
-    if not uploaded_file:
-        return render(
-            request,
-            'api/partials/home_feedback.html',
-            {'message': 'Файл не выбран', 'level': 'danger'},
-            status=400,
-        )
-
-    if uploaded_file.size > 10 * 1024 * 1024:
-        return render(
-            request,
-            'api/partials/home_feedback.html',
-            {'message': 'Файл слишком большой (макс 10 МБ)', 'level': 'danger'},
-            status=400,
-        )
-
-    filename = uploaded_file.name
-    normalized_filename = filename.lower()
-    allowed_content_types = {
-        'txt': {'text/plain', 'application/octet-stream'},
-        'pdf': {'application/pdf', 'application/octet-stream'},
-        'docx': {
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/octet-stream',
-        },
-    }
-
-    if normalized_filename.endswith('.txt'):
-        file_type = 'txt'
-    elif normalized_filename.endswith('.pdf'):
-        file_type = 'pdf'
-    elif normalized_filename.endswith('.docx'):
-        file_type = 'docx'
-    else:
-        return render(
-            request,
-            'api/partials/home_feedback.html',
-            {'message': 'Поддерживаются только .txt, .pdf, .docx', 'level': 'danger'},
-            status=400,
-        )
-
-    if uploaded_file.content_type not in allowed_content_types[file_type]:
-        return render(
-            request,
-            'api/partials/home_feedback.html',
-            {'message': 'Неверный тип файла', 'level': 'danger'},
-            status=400,
-        )
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp:
-        for chunk in uploaded_file.chunks():
-            tmp.write(chunk)
-        tmp_path = tmp.name
-
     try:
-        extracted_text = FileProcessor.extract_text(tmp_path)
-
-        if not extracted_text or not extracted_text.strip():
-            return render(
-                request,
-                'api/partials/home_feedback.html',
-                {'message': 'Из файла не удалось извлечь текст', 'level': 'danger'},
-                status=400,
-            )
-
-        data = {
-            'original_filename': filename,
-            'file_size': uploaded_file.size,
-            'file_type': file_type,
-            'extracted_text': extracted_text,
-        }
-
-        serializer = UploadedFileSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-
-        response = render(
+        processed_upload = extract_uploaded_file(request.FILES.get("file"))
+    except FileServiceError as error:
+        return _render_feedback(
             request,
-            'api/partials/home_feedback.html',
-            {'message': f'Файл загружен: {filename}', 'level': 'success'},
-        )
-        response['HX-Trigger'] = json.dumps({
-            'homeFileUploaded': {
-                'text': extracted_text,
-                'filename': filename,
-            }
-        })
-        return response
-    except Exception as e:
-        return render(
-            request,
-            'api/partials/home_feedback.html',
-            {'message': str(e), 'level': 'danger'},
+            "api/partials/home_feedback.html",
+            str(error),
+            "danger",
             status=400,
         )
-    finally:
-        os.unlink(tmp_path)
+
+    serializer = UploadedFileSerializer(
+        data={
+            "original_filename": processed_upload.original_filename,
+            "file_size": processed_upload.file_size,
+            "file_type": processed_upload.file_type,
+            "extracted_text": processed_upload.extracted_text,
+        }
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save(user=request.user)
+
+    response = _render_feedback(
+        request,
+        "api/partials/home_feedback.html",
+        f"Файл загружен: {processed_upload.original_filename}",
+        "success",
+    )
+    response["HX-Trigger"] = json.dumps(
+        {
+            "homeFileUploaded": {
+                "text": processed_upload.extracted_text,
+                "filename": processed_upload.original_filename,
+            }
+        }
+    )
+    return response
 
 
 @login_required
 @require_POST
 def home_summarize_view(request):
-    input_text = request.POST.get('input_text', '')
-    model = request.POST.get('model', 'extractive_textrank')
-
-    if not input_text.strip():
-        return render(
-            request,
-            'api/partials/home_summary_result.html',
-            {'error': 'Введите текст или загрузите файл'},
-            status=400,
-        )
-
-    start_time = time.time()
+    model_name = request.POST.get("model", "extractive_textrank")
 
     try:
-        summarizer = get_model(model)
-        if not summarizer:
-            return render(
-                request,
-                'api/partials/home_summary_result.html',
-                {'error': f'Модель {model} не найдена'},
-                status=400,
-            )
-
-        if model.startswith('extractive'):
-            sentences_count = int(request.POST.get('sentence_count', 5))
-            output_text = summarizer.summarize(input_text, sentences_count)
-            length_value = sentences_count
+        if model_name.startswith("extractive"):
+            length_param = request.POST.get("sentence_count", 5)
         else:
-            min_words = int(request.POST.get('min_words', 50))
-            max_words = int(request.POST.get('max_words', 150))
-            output_text = summarizer.summarize(
-                input_text,
-                max_length=max_words,
-                min_length=min_words,
-            )
-            length_value = max_words
-    except Exception as e:
+            length_param = {
+                "min": request.POST.get("min_words", 50),
+                "max": request.POST.get("max_words", 150),
+            }
+
+        payload = summarize_text(
+            input_text=request.POST.get("input_text", ""),
+            model_name=model_name,
+            length_param=length_param,
+        )
+        _save_summary_request(request.user, payload)
+    except SummarizationServiceError as error:
         return render(
             request,
-            'api/partials/home_summary_result.html',
-            {'error': f'Ошибка: {str(e)}'},
+            "api/partials/home_summary_result.html",
+            {"error": str(error)},
+            status=400,
+        )
+    except Exception:
+        return render(
+            request,
+            "api/partials/home_summary_result.html",
+            {"error": "Не удалось сохранить результат суммаризации"},
             status=500,
         )
 
-    processing_time = time.time() - start_time
-
-    data = {
-        'input_text': input_text,
-        'output_text': output_text,
-        'summary_type': 'extractive' if model.startswith('extractive') else 'abstractive',
-        'model_name': model,
-        'length_param': length_value,
-        'processing_time': processing_time,
-    }
-
-    serializer = SummaryRequestSerializer(data=data)
-    if not serializer.is_valid():
-        return render(
-            request,
-            'api/partials/home_summary_result.html',
-            {'error': 'Не удалось сохранить результат'},
-            status=400,
-        )
-
-    serializer.save(user=request.user)
-
     context = {
-        'output_text': output_text,
-        'processing_time': processing_time,
-        'words_count': len(output_text.split()),
-        'sentences_count': len([item for item in output_text.replace('!', '.').replace('?', '.').split('.') if item.strip()]),
+        "output_text": payload.output_text,
+        "processing_time": payload.processing_time,
+        "words_count": len(payload.output_text.split()),
+        "sentences_count": len(
+            [
+                item
+                for item in payload.output_text.replace("!", ".").replace("?", ".").split(".")
+                if item.strip()
+            ]
+        ),
     }
-    return render(request, 'api/partials/home_summary_result.html', context)
+    return render(request, "api/partials/home_summary_result.html", context)
 
 
 @login_required
@@ -223,77 +171,31 @@ def home_summarize_view(request):
 def file_summarize_view(request, pk):
     file_record = get_object_or_404(UploadedFile, pk=pk, user=request.user)
 
-    if not file_record.extracted_text:
-        return render(
-            request,
-            'api/partials/file_summary_feedback.html',
-            {'message': 'Не удалось извлечь текст из файла', 'level': 'danger'},
-            status=400,
-        )
-
-    summary_type = request.POST.get('summary_type', 'extractive')
-
     try:
-        length_param = int(request.POST.get('length_param', 5))
-    except (TypeError, ValueError):
-        return render(
+        payload = summarize_file_text(
+            input_text=file_record.extracted_text,
+            summary_type=request.POST.get("summary_type", "extractive"),
+            length_param=request.POST.get("length_param", 5),
+            model_name=request.POST.get("model_name"),
+        )
+        _save_summary_request(request.user, payload)
+    except SummarizationServiceError as error:
+        return _render_feedback(
             request,
-            'api/partials/file_summary_feedback.html',
-            {'message': 'Параметр длины должен быть числом', 'level': 'danger'},
+            "api/partials/file_summary_feedback.html",
+            str(error),
+            "danger",
             status=400,
         )
-
-    start_time = time.time()
-
-    if summary_type == 'extractive':
-        summarizer = get_model('extractive_textrank')
-        model_name = 'extractive_textrank'
-        output_text = summarizer.summarize(file_record.extracted_text, length_param)
-    elif summary_type == 'abstractive':
-        summarizer = get_model('abstractive_cointegrated')
-        model_name = 'abstractive_cointegrated'
-        if not summarizer:
-            return render(
-                request,
-                'api/partials/file_summary_feedback.html',
-                {'message': 'Абстрактивная модель не загружена', 'level': 'danger'},
-                status=400,
-            )
-        output_text = summarizer.summarize(
-            file_record.extracted_text,
-            max_length=length_param * 20,
-            min_length=length_param * 10,
-        )
-    else:
-        return render(
+    except Exception:
+        return _render_feedback(
             request,
-            'api/partials/file_summary_feedback.html',
-            {'message': 'Неизвестный тип суммаризации', 'level': 'danger'},
-            status=400,
+            "api/partials/file_summary_feedback.html",
+            "Не удалось сохранить результат суммаризации",
+            "danger",
+            status=500,
         )
 
-    processing_time = time.time() - start_time
-
-    summary_data = {
-        'input_text': file_record.extracted_text,
-        'output_text': output_text,
-        'summary_type': summary_type,
-        'model_name': model_name,
-        'length_param': length_param,
-        'processing_time': processing_time,
-    }
-
-    serializer = SummaryRequestSerializer(data=summary_data)
-    if not serializer.is_valid():
-        return render(
-            request,
-            'api/partials/file_summary_feedback.html',
-            {'message': 'Не удалось сохранить результат', 'level': 'danger'},
-            status=400,
-        )
-
-    serializer.save(user=request.user)
-
-    response = HttpResponse('')
-    response['HX-Redirect'] = '/history/'
+    response = HttpResponse("")
+    response["HX-Redirect"] = "/history/"
     return response

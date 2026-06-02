@@ -30,8 +30,7 @@ async function copyToClipboard(text) {
         await navigator.clipboard.writeText(text);
         showAlert('Скопировано в буфер обмена', 'success');
         return true;
-    } catch (err) {
-        console.error('Ошибка копирования:', err);
+    } catch {
         showAlert('Не удалось скопировать текст', 'error');
         return false;
     }
@@ -51,16 +50,18 @@ function countSentences(text) {
     return text.split(/[.!?]+/).filter(sentence => sentence.trim().length > 0).length;
 }
 
-document.addEventListener('click', async (event) => {
+document.addEventListener('click', async event => {
     const button = event.target.closest('.copy-result-button');
     if (!button) {
         return;
     }
+
     const targetId = button.dataset.copyTarget;
     const target = document.getElementById(targetId);
     if (!target) {
         showAlert('Текст для копирования не найден', 'error');
         return;
     }
+
     await copyToClipboard(target.textContent || '');
 });
