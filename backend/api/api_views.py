@@ -1,6 +1,7 @@
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
 from api.models import SummaryRequest, UploadedFile
 from api.serializers import SummaryRequestSerializer, UploadedFileSerializer
 from api.services.file_service import FileServiceError, extract_uploaded_file
@@ -32,8 +33,11 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
             summary = summarize_text(input_text, model_name, length_param)
         except SummarizationServiceError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as error:
-            return Response({"error": f"Ошибка: {error}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            return Response(
+                {"error": "Не удалось выполнить суммаризацию"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = self.get_serializer(data=summary.__dict__)
         if not serializer.is_valid():
@@ -63,8 +67,8 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             processed_upload = extract_uploaded_file(request.FILES.get("file"))
         except FileServiceError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response({"error": "Не удалось обработать файл"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = self.get_serializer(data=processed_upload.__dict__)
         serializer.is_valid(raise_exception=True)
@@ -99,8 +103,11 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             )
         except SummarizationServiceError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as error:
-            return Response({"error": f"Ошибка: {error}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            return Response(
+                {"error": "Не удалось выполнить суммаризацию файла"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = SummaryRequestSerializer(data=summary.__dict__)
         serializer.is_valid(raise_exception=True)
