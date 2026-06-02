@@ -6,7 +6,7 @@ class SummaryRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = SummaryRequest
         fields = ['id', 'input_text', 'output_text', 'summary_type',
-                  'length_param', 'created_at', 'processing_time']
+                  'length_param', 'model_name', 'created_at', 'processing_time']
         read_only_fields = ['id', 'created_at']
 
 class UploadedFileSerializer(serializers.ModelSerializer):

@@ -4,9 +4,9 @@ from .models import SummaryRequest, UploadedFile
 
 @admin.register(SummaryRequest)
 class SummaryRequestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'summary_type', 'created_at', 'processing_time', 'short_input', 'short_output')
-    list_filter = ('summary_type', 'created_at')
-    search_fields = ('user__username', 'input_text', 'output_text')
+    list_display = ('id', 'user', 'summary_type', 'model_name', 'created_at', 'processing_time', 'short_input', 'short_output')
+    list_filter = ('summary_type', 'model_name', 'created_at')
+    search_fields = ('user__username', 'input_text', 'output_text', 'model_name')
     readonly_fields = ('input_text', 'output_text', 'created_at', 'processing_time')
 
     def short_input(self, obj):
@@ -24,7 +24,7 @@ class SummaryRequestAdmin(admin.ModelAdmin):
             'fields': ('user',)
         }),
         ('Параметры', {
-            'fields': ('summary_type', 'length_param', 'processing_time', 'created_at')
+            'fields': ('summary_type', 'model_name', 'length_param', 'processing_time', 'created_at')
         }),
         ('Тексты', {
             'fields': ('input_text', 'output_text'),

@@ -197,12 +197,14 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
         if summary_type == 'extractive':
             summarizer = get_model('extractive_textrank')
+            model_name = 'extractive_textrank'
             output_text = summarizer.summarize(
                 file_record.extracted_text,
                 length_param
             )
         elif summary_type == 'abstractive':
             summarizer = get_model('abstractive_cointegrated')
+            model_name = 'abstractive_cointegrated'
             if summarizer:
                 output_text = summarizer.summarize(
                     file_record.extracted_text,
@@ -212,14 +214,16 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             else:
                 output_text = "Р С’Р В±РЎРѓРЎвЂљРЎР‚Р В°Р С”РЎвЂљР С‘Р Р†Р Р…Р В°РЎРЏ Р СР С•Р Т‘Р ВµР В»РЎРЉ Р Р…Р Вµ Р В·Р В°Р С–РЎР‚РЎС“Р В¶Р ВµР Р…Р В°"
         else:
+            model_name = ''
             output_text = "Р СњР ВµР С‘Р В·Р Р†Р ВµРЎРѓРЎвЂљР Р…РЎвЂ№Р в„– РЎвЂљР С‘Р С— РЎРѓРЎС“Р СР СР В°РЎР‚Р С‘Р В·Р В°РЎвЂ Р С‘Р С‘"
 
         processing_time = time.time() - start_time
 
         summary_data = {
-            'input_text': file_record.extracted_text[:500] + "...",
+            'input_text': file_record.extracted_text,
             'output_text': output_text,
             'summary_type': summary_type,
+            'model_name': model_name,
             'length_param': length_param,
             'processing_time': processing_time
         }
