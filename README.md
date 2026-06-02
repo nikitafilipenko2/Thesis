@@ -4,8 +4,8 @@
 🔗 Приложение доступно по адресу:
 https://summarizer.pythonanywhere.com
 
-![Главная страницы](paper/img.jpg)
-![История](paper/img_1.jpg)
+![Главная страницы](paper/img.png)
+![История](paper/img_1.png)
 
 ## 🚀 Возможности
 - Суммаризация текста с использованием экстрактивных методов (TextRank, LSA, LexRank)
