@@ -3,12 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import SummaryRequest
 from .serializers import SummaryRequestSerializer
-from .summarization import ExtractiveSummarizer
-import time
-from .abstractive import AbstractiveSummarizer
 from .models import UploadedFile
 from .serializers import UploadedFileSerializer
 from .file_processor import FileProcessor
+from .services.model_service import get_model
+import time
 import tempfile
 import os
 from django.shortcuts import render, redirect, get_object_or_404
@@ -16,81 +15,6 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-
-
-extractive_summarizer = ExtractiveSummarizer(method='textrank')
-abstractive_summarizer = None  # Пока не загружаем
-
-_models = {}
-
-
-def load_all_models():
-    """Загружает все модели при старте приложения"""
-    print("=" * 50)
-    print("ЗАГРУЗКА ВСЕХ МОДЕЛЕЙ...")
-    print("=" * 50)
-
-    # Экстрактивные модели (они легкие, грузятся быстро)
-    print("Загрузка экстрактивных моделей...")
-    _models['extractive_textrank'] = ExtractiveSummarizer(method='textrank')
-    _models['extractive_lsa'] = ExtractiveSummarizer(method='lsa')
-    _models['extractive_lexrank'] = ExtractiveSummarizer(method='lexrank')
-    print("✓ Экстрактивные модели загружены")
-
-    # Абстрактивные модели (тяжелые, могут долго грузиться)
-    print("\nЗагрузка абстрактивных моделей (это может занять несколько минут)...")
-
-    try:
-        print("  - Загрузка cointegrated/rut5-base-absum (500 МБ)...")
-        _models['abstractive_cointegrated'] = AbstractiveSummarizer(
-            model_name="cointegrated/rut5-base-absum"
-        )
-        print("  ✓ cointegrated загружена")
-    except Exception as e:
-        print(f"  ✗ Ошибка загрузки cointegrated: {e}")
-
-    # try:
-    #     print("  - Загрузка IlyaGusev/rut5_base_sum_gazeta (1.5 ГБ)...")
-    #     _models['abstractive_rut5'] = AbstractiveSummarizer(
-    #         model_name="IlyaGusev/rut5_base_sum_gazeta"
-    #     )
-    #     print("  ✓ ruT5 загружена")
-    # except Exception as e:
-    #     print(f"  ✗ Ошибка загрузки ruT5: {e}")
-    #
-    # try:
-    #     print("  - Загрузка IlyaGusev/mbart_ru_sum_gazeta (5 ГБ)...")
-    #     _models['abstractive_mbart'] = AbstractiveSummarizer(
-    #         model_name="IlyaGusev/mbart_ru_sum_gazeta"
-    #     )
-    #     print("  ✓ mBART загружена")
-    # except Exception as e:
-    #     print(f"  ✗ Ошибка загрузки mBART: {e}")
-
-    print("\n" + "=" * 50)
-    print(f"ЗАГРУЖЕНО МОДЕЛЕЙ: {len(_models)}")
-    print("=" * 50)
-
-    return _models
-
-
-def get_model(model_name):
-    """Возвращает модель из кэша"""
-    if not _models:
-        load_all_models()
-    return _models.get(model_name)
-def get_abstractive_summarizer():
-    global abstractive_summarizer
-    if abstractive_summarizer is None:
-        try:
-            print("Начинаю загрузку абстрактивной модели (5 ГБ)...")
-            print("Это займет 5-10 минут в первый раз")
-            abstractive_summarizer = AbstractiveSummarizer()
-            print("Модель успешно загружена!")
-        except Exception as e:
-            print(f"НЕ УДАЛОСЬ ЗАГРУЗИТЬ МОДЕЛЬ: {e}")
-            abstractive_summarizer = None
-    return abstractive_summarizer
 
 class SummaryRequestViewSet(viewsets.ModelViewSet):
     serializer_class = SummaryRequestSerializer
@@ -105,31 +29,30 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def summarize(self, request):
-        print("=== МЕТОД SUMMARIZE ВЫЗВАН ===")
+        print("=== РМЕТРД SUMMARIZE Р’Р«Р—Р’РђРќ ===")
 
         input_text = request.data.get('input_text', '')
         model = request.data.get('model', 'extractive_textrank')
         length_param = request.data.get('length_param', 5)
 
-        print(f"Модель: {model}")
-        print(f"Параметры длины: {length_param}")
-        print(f"Длина текста: {len(input_text)} символов")
+        print(f"РњРѕРґРµР»СЊ: {model}")
+        print(f"РџР°СЂР°РјРµС‚СЂС‹ РґР»РёРЅС‹: {length_param}")
+        print(f"Р”Р»РёРЅР° С‚РµРєСЃС‚Р°: {len(input_text)} СЃРёРјРІРѕР»РѕРІ")
 
         if not input_text:
             return Response(
-                {'error': 'Текст не может быть пустым'},
+                {'error': 'РўРµРєСЃС‚ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         start_time = time.time()
 
         try:
-            # Получаем модель из кэша
             summarizer = get_model(model)
 
             if not summarizer:
                 return Response(
-                    {'error': f'Модель {model} не найдена'},
+                    {'error': f'РњРѕРґРµР»СЊ {model} РЅРµ РЅР°Р№РґРµРЅР°'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -158,11 +81,11 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
                 length_value = max_words
 
         except Exception as e:
-            print(f"ОШИБКА: {str(e)}")
+            print(f"РћРЁРР‘РљРђ: {str(e)}")
             import traceback
             traceback.print_exc()
             return Response(
-                {'error': f'Ошибка: {str(e)}'},
+                {'error': f'РћС€РёР±РєР°: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -186,9 +109,9 @@ class SummaryRequestViewSet(viewsets.ModelViewSet):
 
         self.perform_create(serializer)
 
-        print(f"Сохранено, ID: {serializer.data.get('id')}")
-        print(f"Время обработки: {processing_time} сек")
-        print("=== ЗАПРОС ОБРАБОТАН ===")
+        print(f"РЎРѕС…СЂР°РЅРµРЅРѕ, ID: {serializer.data.get('id')}")
+        print(f"Р’СЂРµРјСЏ РѕР±СЂР°Р±РѕС‚РєРё: {processing_time} СЃРµРє")
+        print("=== Р—РђРџР РћРЎ РћР‘Р РђР‘РћРўРђРќ ===")
 
         return Response(serializer.data)
 
@@ -209,18 +132,16 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
             return Response(
-                {'error': 'Файл не выбран'},
+                {'error': 'Р¤Р°Р№Р» РЅРµ РІС‹Р±СЂР°РЅ'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Проверка размера (макс 10 МБ)
         if uploaded_file.size > 10 * 1024 * 1024:
             return Response(
-                {'error': 'Файл слишком большой (макс 10 МБ)'},
+                {'error': 'Р¤Р°Р№Р» СЃР»РёС€РєРѕРј Р±РѕР»СЊС€РѕР№ (РјР°РєСЃ 10 РњР‘)'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Определяем тип файла
         filename = uploaded_file.name
         if filename.endswith('.txt'):
             file_type = 'txt'
@@ -230,21 +151,18 @@ class FileUploadViewSet(viewsets.ModelViewSet):
             file_type = 'docx'
         else:
             return Response(
-                {'error': 'Поддерживаются только .txt, .pdf, .docx'},
+                {'error': 'РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ .txt, .pdf, .docx'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Сохраняем временно файл
         with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp:
             for chunk in uploaded_file.chunks():
                 tmp.write(chunk)
             tmp_path = tmp.name
 
         try:
-            # Извлекаем текст
             extracted_text = FileProcessor.extract_text(tmp_path)
 
-            # Создаем запись в БД
             data = {
                 'original_filename': filename,
                 'file_size': uploaded_file.size,
@@ -264,7 +182,6 @@ class FileUploadViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         finally:
-            # Удаляем временный файл
             os.unlink(tmp_path)
 
     @action(detail=True, methods=['post'])
@@ -273,7 +190,7 @@ class FileUploadViewSet(viewsets.ModelViewSet):
 
         if not file_record.extracted_text:
             return Response(
-                {'error': 'Не удалось извлечь текст из файла'},
+                {'error': 'РќРµ СѓРґР°Р»РѕСЃСЊ РёР·РІР»РµС‡СЊ С‚РµРєСЃС‚ РёР· С„Р°Р№Р»Р°'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -283,26 +200,26 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         start_time = time.time()
 
         if summary_type == 'extractive':
-            output_text = extractive_summarizer.summarize(
+            summarizer = get_model('extractive_textrank')
+            output_text = summarizer.summarize(
                 file_record.extracted_text,
                 length_param
             )
         elif summary_type == 'abstractive':
-            summ = get_abstractive_summarizer()
-            if summ:
-                output_text = summ.summarize(
+            summarizer = get_model('abstractive_cointegrated')
+            if summarizer:
+                output_text = summarizer.summarize(
                     file_record.extracted_text,
                     max_length=length_param * 20,
                     min_length=length_param * 10
                 )
             else:
-                output_text = "Абстрактивная модель не загружена"
+                output_text = "РђР±СЃС‚СЂР°РєС‚РёРІРЅР°СЏ РјРѕРґРµР»СЊ РЅРµ Р·Р°РіСЂСѓР¶РµРЅР°"
         else:
-            output_text = "Неизвестный тип суммаризации"
+            output_text = "РќРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї СЃСѓРјРјР°СЂРёР·Р°С†РёРё"
 
         processing_time = time.time() - start_time
 
-        # Сохраняем результат как обычный запрос
         summary_data = {
             'input_text': file_record.extracted_text[:500] + "...",
             'output_text': output_text,
@@ -315,7 +232,6 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         summary_serializer.is_valid(raise_exception=True)
         summary_serializer.save(user=request.user)
 
-        # Сериализуем сам файл для ответа
         file_serializer = self.get_serializer(file_record)
 
         return Response({
@@ -331,16 +247,16 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            messages.success(request, 'Вы успешно вошли')
+            messages.success(request, 'Р’С‹ СѓСЃРїРµС€РЅРѕ РІРѕС€Р»Рё')
             return redirect('home')
         else:
-            messages.error(request, 'Неверный логин или пароль')
+            messages.error(request, 'РќРµРІРµСЂРЅС‹Р№ Р»РѕРіРёРЅ РёР»Рё РїР°СЂРѕР»СЊ')
     return render(request, 'api/login.html')
 
 
 def logout_view(request):
     logout(request)
-    messages.success(request, 'Вы вышли из системы')
+    messages.success(request, 'Р’С‹ РІС‹С€Р»Рё РёР· СЃРёСЃС‚РµРјС‹')
     return redirect('login')
 
 
@@ -351,17 +267,17 @@ def register_view(request):
         password2 = request.POST.get('password2')
 
         if password != password2:
-            messages.error(request, 'Пароли не совпадают')
+            messages.error(request, 'РџР°СЂРѕР»Рё РЅРµ СЃРѕРІРїР°РґР°СЋС‚')
         elif len(password) < 6:
-            messages.error(request, 'Пароль должен быть не менее 6 символов')
+            messages.error(request, 'РџР°СЂРѕР»СЊ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РЅРµ РјРµРЅРµРµ 6 СЃРёРјРІРѕР»РѕРІ')
         else:
             from django.contrib.auth.models import User
             try:
                 user = User.objects.create_user(username=username, password=password)
-                messages.success(request, 'Регистрация успешна! Теперь войдите')
+                messages.success(request, 'Р РµРіРёСЃС‚СЂР°С†РёСЏ СѓСЃРїРµС€РЅР°! РўРµРїРµСЂСЊ РІРѕР№РґРёС‚Рµ')
                 return redirect('login')
             except:
-                messages.error(request, 'Пользователь с таким именем уже существует')
+                messages.error(request, 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј РёРјРµРЅРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚')
 
     return render(request, 'api/register.html')
 
@@ -387,5 +303,3 @@ def files_view(request):
 def request_detail_view(request, pk):
     req = get_object_or_404(SummaryRequest, pk=pk, user=request.user)
     return render(request, 'api/request_detail.html', {'request': req})
-
-load_all_models()
