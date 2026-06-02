@@ -1,0 +1,18 @@
+{% if error %}
+<div class="alert alert-danger">
+    {{ error }}
+</div>
+{% else %}
+<div class="mt-4 fade-in">
+    <hr>
+    <h5>Результат:</h5>
+    <div class="result-box" id="summary-result-text">{{ output_text }}</div>
+    <div class="mt-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-primary copy-result-button" type="button" data-copy-target="summary-result-text">
+            <i class="bi bi-clipboard"></i> Копировать
+        </button>
+        <span class="text-muted">Время: {{ processing_time|floatformat:2 }} сек</span>
+        <span class="badge bg-info">Слов: {{ words_count }}, предложений: {{ sentences_count }}</span>
+    </div>
+</div>
+{% endif %}

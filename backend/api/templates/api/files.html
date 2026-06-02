@@ -3,6 +3,10 @@
 
 {% block title %}Мои файлы{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/files.css' %}">
+{% endblock %}
+
 {% block content %}
 <div x-data="filesPage()">
     <div class="card">

@@ -1,0 +1,7 @@
+.result-box {
+    background-color: #f8f9fa;
+    border-left: 5px solid #007bff;
+    padding: 20px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+}

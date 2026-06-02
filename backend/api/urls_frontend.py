@@ -1,9 +1,11 @@
 from django.urls import path
 from .auth_views import login_view, logout_view, register_view
-from .web_views import home_view, history_view, files_view, request_detail_view, file_summarize_view
+from .web_views import home_view, history_view, files_view, request_detail_view, home_upload_view, home_summarize_view, file_summarize_view
 
 urlpatterns = [
     path('', home_view, name='home'),
+    path('upload/', home_upload_view, name='home_upload'),
+    path('summarize/', home_summarize_view, name='home_summarize'),
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
