@@ -14,9 +14,11 @@
 
 ## ⚙️ Инструкция по запуску
 
-1. Склонируйте код с репозитория
+0. Склонируйте код с репозитория
 `git clone https://github.com/nikitafilipenko2/Thesis.git`
-2. Откройте проект в среде разработки, например PyCharm.
+1. Откройте проект в среде разработки, например PyCharm.
+2. Перейдите в папку backend 
+`cd backend`
 3. Установите зависимости из requirements.txt.
 `pip install -r requirements.txt`
 4. Выполните миграцию бд.
