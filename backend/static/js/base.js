@@ -25,15 +25,51 @@ function showAlert(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
-async function copyToClipboard(text) {
+function fallbackCopyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    textArea.style.pointerEvents = 'none';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    let copied = false;
     try {
-        await navigator.clipboard.writeText(text);
-        showAlert('Скопировано в буфер обмена', 'success');
-        return true;
+        copied = document.execCommand('copy');
     } catch {
-        showAlert('Не удалось скопировать текст', 'error');
+        copied = false;
+    }
+
+    document.body.removeChild(textArea);
+    return copied;
+}
+
+async function copyToClipboard(text) {
+    if (!text) {
+        showAlert('Нет текста для копирования', 'error');
         return false;
     }
+
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showAlert('Скопировано в буфер обмена', 'success');
+            return true;
+        } catch {
+        }
+    }
+
+    const copied = fallbackCopyToClipboard(text);
+    if (copied) {
+        showAlert('Скопировано в буфер обмена', 'success');
+        return true;
+    }
+
+    showAlert('Не удалось скопировать текст', 'error');
+    return false;
 }
 
 function countWords(text) {

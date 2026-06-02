@@ -16,14 +16,20 @@ function summarizerApp() {
         get totalWords() {
             return countWords(this.text);
         },
-        get maxSentencesAvailable() {
-            return Math.min(20, Math.max(1, this.totalSentences));
+        get sentenceSliderMax() {
+            return Math.min(20, Math.max(1, this.totalSentences || 1));
         },
-        get recommendedMin() {
-            return Math.max(20, Math.floor(this.totalWords * 0.05));
+        get abstractiveMinBound() {
+            return 20;
         },
-        get recommendedMax() {
-            return Math.min(500, Math.max(30, Math.floor(this.totalWords * 0.3)));
+        get abstractiveMaxBound() {
+            return Math.max(30, Math.min(500, Math.floor(this.totalWords * 0.3) || 150));
+        },
+        get minWordsSliderMax() {
+            return Math.max(this.abstractiveMinBound, this.abstractiveMaxBound - 10);
+        },
+        get maxWordsSliderMin() {
+            return Math.min(this.abstractiveMaxBound, this.minWords + 10);
         },
         normalizeSavedModel(model) {
             const allowedModels = [
@@ -37,48 +43,53 @@ function summarizerApp() {
             ];
             return allowedModels.includes(model) ? model : 'extractive_textrank';
         },
+        normalizeExtractiveRange() {
+            if (this.sentenceCount > this.sentenceSliderMax) {
+                this.sentenceCount = this.sentenceSliderMax;
+            }
+            if (this.sentenceCount < 1) {
+                this.sentenceCount = 1;
+            }
+        },
+        normalizeAbstractiveRange() {
+            const sliderMax = this.abstractiveMaxBound;
+            const minSliderMax = this.minWordsSliderMax;
+
+            if (this.minWords < this.abstractiveMinBound) {
+                this.minWords = this.abstractiveMinBound;
+            }
+            if (this.minWords > minSliderMax) {
+                this.minWords = minSliderMax;
+            }
+
+            if (this.maxWords < this.minWords + 10) {
+                this.maxWords = this.minWords + 10;
+            }
+            if (this.maxWords > sliderMax) {
+                this.maxWords = sliderMax;
+            }
+
+            if (this.maxWords <= this.minWords) {
+                this.maxWords = Math.min(sliderMax, this.minWords + 10);
+            }
+            if (this.minWords >= this.maxWords) {
+                this.minWords = Math.max(this.abstractiveMinBound, this.maxWords - 10);
+            }
+        },
         analyzeAndUpdateSliders() {
-            const text = this.text.trim();
-            if (!text) {
+            if (!this.text.trim()) {
                 return;
             }
 
             if (this.isExtractive) {
-                const maxVal = this.maxSentencesAvailable;
-                if (this.sentenceCount > maxVal) {
-                    this.sentenceCount = maxVal;
-                }
-                this.$nextTick(() => {
-                    if (this.$refs.sentenceSlider) {
-                        this.$refs.sentenceSlider.max = maxVal;
-                    }
-                });
+                this.normalizeExtractiveRange();
                 return;
             }
 
-            const recMin = this.recommendedMin;
-            const recMax = this.recommendedMax;
-            if (this.minWords < recMin) {
-                this.minWords = recMin;
-            }
-            if (this.maxWords > recMax) {
-                this.maxWords = recMax;
-            }
-            if (this.minWords >= this.maxWords) {
-                this.minWords = recMin;
-                this.maxWords = Math.max(recMin + 10, recMax);
-            }
-            this.$nextTick(() => {
-                if (this.$refs.minWordsSlider) {
-                    this.$refs.minWordsSlider.max = Math.max(recMin, recMax - 10);
-                }
-                if (this.$refs.maxWordsSlider) {
-                    this.$refs.maxWordsSlider.min = recMin + 10;
-                    this.$refs.maxWordsSlider.max = recMax;
-                }
-            });
+            this.normalizeAbstractiveRange();
         },
         updateModel() {
+            this.analyzeAndUpdateSliders();
             localStorage.setItem('summarizer', JSON.stringify({
                 text: this.text,
                 model: this.model,
@@ -86,9 +97,6 @@ function summarizerApp() {
                 minWords: this.minWords,
                 maxWords: this.maxWords
             }));
-            if (this.text.trim()) {
-                this.analyzeAndUpdateSliders();
-            }
         },
         init() {
             const saved = localStorage.getItem('summarizer');
@@ -100,11 +108,24 @@ function summarizerApp() {
                 this.minWords = data.minWords || 50;
                 this.maxWords = data.maxWords || 150;
             }
-            if (this.text.trim()) {
-                this.$nextTick(() => this.analyzeAndUpdateSliders());
-            }
-            this.$watch('text', () => this.analyzeAndUpdateSliders());
+
+            this.analyzeAndUpdateSliders();
+
+            this.$watch('text', () => {
+                this.analyzeAndUpdateSliders();
+                this.updateModel();
+            });
             this.$watch('model', () => this.updateModel());
+            this.$watch('sentenceCount', () => this.updateModel());
+            this.$watch('minWords', () => {
+                this.normalizeAbstractiveRange();
+                this.updateModel();
+            });
+            this.$watch('maxWords', () => {
+                this.normalizeAbstractiveRange();
+                this.updateModel();
+            });
+
             document.body.addEventListener('homeFileUploaded', event => {
                 this.text = event.detail.text || '';
                 this.tab = 'text';

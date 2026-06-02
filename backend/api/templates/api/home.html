@@ -35,7 +35,6 @@
                             <textarea
                                 class="form-control"
                                 x-model="text"
-                                @input="analyzeAndUpdateSliders()"
                                 rows="8"
                                 placeholder="Вставьте текст для суммаризации..."
                             ></textarea>
@@ -85,7 +84,7 @@
                         <div class="row mb-3 mt-3">
                             <div class="col-md-12">
                                 <label class="form-label">Модель суммаризации</label>
-                                <select class="form-select" x-model="model" @change="updateModel()">
+                                <select class="form-select" x-model="model">
                                     <optgroup label="Экстрактивные">
                                         <option value="extractive_textrank">TextRank</option>
                                         <option value="extractive_lsa">LSA</option>
@@ -106,10 +105,9 @@
                                 <input
                                     type="range"
                                     class="form-range"
-                                    x-model="sentenceCount"
-                                    x-ref="sentenceSlider"
+                                    x-model.number="sentenceCount"
                                     min="1"
-                                    max="20"
+                                    :max="sentenceSliderMax"
                                     step="1"
                                 >
                             </div>
@@ -118,11 +116,25 @@
                         <div x-show="!isExtractive" x-transition class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label">Минимум слов: <span x-text="minWords"></span></label>
-                                <input type="range" class="form-range" x-model="minWords" x-ref="minWordsSlider" min="20" max="490" step="10">
+                                <input
+                                    type="range"
+                                    class="form-range"
+                                    x-model.number="minWords"
+                                    :min="abstractiveMinBound"
+                                    :max="minWordsSliderMax"
+                                    step="10"
+                                >
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Максимум слов: <span x-text="maxWords"></span></label>
-                                <input type="range" class="form-range" x-model="maxWords" x-ref="maxWordsSlider" min="30" max="500" step="10">
+                                <input
+                                    type="range"
+                                    class="form-range"
+                                    x-model.number="maxWords"
+                                    :min="maxWordsSliderMin"
+                                    :max="abstractiveMaxBound"
+                                    step="10"
+                                >
                             </div>
                         </div>
 
