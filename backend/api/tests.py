@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from rest_framework.test import APIClient
 
+from api.abstractive import AbstractiveSummarizer
 from api.models import SummaryRequest, UploadedFile
 from api.services.file_service import FileServiceError, ProcessedUpload
 from api.services.summarization_service import SummarizationServiceError, summarize_file_text, summarize_text
@@ -58,6 +59,48 @@ class SummarizationServiceTests(TestCase):
         summarize_file_text("Текст", "abstractive", 5)
 
         summarize_text_mock.assert_called_once_with("Текст", "cointegrated/rut5-base-absum", 5)
+
+
+class AbstractiveSummarizerTests(TestCase):
+    def test_build_chunks_splits_long_text(self):
+        summarizer = AbstractiveSummarizer.__new__(AbstractiveSummarizer)
+        summarizer.model_name = "cointegrated/rut5-base-absum"
+        summarizer.CHUNK_SIZE = 60
+        summarizer.CHUNK_OVERLAP = 10
+
+        text = (
+            "Первое предложение достаточно длинное для теста. "
+            "Второе предложение тоже длинное. "
+            "Третье предложение завершает пример."
+        )
+        chunks = summarizer._build_chunks(text)
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 60 for chunk in chunks))
+
+    def test_summarize_runs_pipeline_for_each_chunk_and_final_merge(self):
+        summarizer = AbstractiveSummarizer.__new__(AbstractiveSummarizer)
+        summarizer.model_name = "cointegrated/rut5-base-absum"
+        summarizer.CHUNK_SIZE = 40
+        summarizer.CHUNK_OVERLAP = 5
+        summarizer.summarizer = Mock(
+            side_effect=[
+                [{"summary_text": "summary one"}],
+                [{"summary_text": "summary two"}],
+                [{"summary_text": "summary three"}],
+                [{"summary_text": "final summary"}],
+            ]
+        )
+
+        result = AbstractiveSummarizer.summarize(
+            summarizer,
+            "Первое длинное предложение для теста. Второе длинное предложение для теста.",
+            max_length=80,
+            min_length=30,
+        )
+
+        self.assertEqual(result, "final summary")
+        self.assertGreaterEqual(summarizer.summarizer.call_count, 3)
 
 
 class WebViewsTests(TestCase):

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from sumy.nlp.stemmers import Stemmer
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.parsers.plaintext import PlaintextParser
@@ -25,11 +23,25 @@ class ExtractiveSummarizer:
 
     @staticmethod
     def _load_stop_words():
-        stopwords_path = Path(__file__).with_name("russian_stopwords.txt")
-        if not stopwords_path.exists():
+        try:
+            from nltk import download
+            from nltk.corpus import stopwords
+            from nltk.data import find
+        except ImportError:
             return []
-        with stopwords_path.open("r", encoding="utf-8") as source:
-            return [line.strip() for line in source if line.strip()]
+
+        try:
+            find("corpora/stopwords")
+        except LookupError:
+            try:
+                download("stopwords", quiet=True)
+            except Exception:
+                return []
+
+        try:
+            return stopwords.words("russian")
+        except LookupError:
+            return []
 
     def summarize(self, text, sentences_count=5):
         normalized_text = " ".join((text or "").split())
