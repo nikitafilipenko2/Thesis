@@ -2,144 +2,123 @@
 
 {% block title %}Главная{% endblock %}
 
-{% block extra_css %}
-<style>
-    /* Стили для вкладок — делаем текст всегда черным */
-    .nav-tabs .nav-link {
-        color: #000000 !important;
-    }
-
-    .nav-tabs .nav-link:hover {
-        color: #000000 !important;
-    }
-
-    .nav-tabs .nav-link.active {
-        color: #000000 !important;
-        font-weight: 500;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-10">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"> Суммаризация текста</h4>
+                <h4 class="mb-0">Суммаризация текста</h4>
             </div>
             <div class="card-body">
-                <form id="summarizeForm">
+                <div x-data="summarizerApp()" x-init="init()">
                     {% csrf_token %}
 
-                    <!-- Выбор режима ввода -->
-                    <ul class="nav nav-tabs mb-3" id="inputTab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active text-dark" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">
+                    <!-- Вкладки -->
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link" :class="{'active': tab === 'text'}" @click="tab = 'text'" type="button">
                                 <i class="bi bi-text-paragraph"></i> Текст
                             </button>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link text-dark" id="file-tab" data-bs-toggle="tab" data-bs-target="#file" type="button" role="tab">
+                        <li class="nav-item">
+                            <button class="nav-link" :class="{'active': tab === 'file'}" @click="tab = 'file'" type="button">
                                 <i class="bi bi-file-earmark"></i> Файл
                             </button>
                         </li>
                     </ul>
 
-                    <!-- Содержимое вкладок -->
-                    <div class="tab-content mb-3">
-                        <!-- Вкладка с текстом -->
-                        <div class="tab-pane fade show active" id="text" role="tabpanel">
-                            <div class="mb-3">
-                                <label for="inputText" class="form-label">Введите текст</label>
-                                <textarea class="form-control" id="inputText" rows="8" placeholder="Вставьте текст для суммаризации..."></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Вкладка с файлом -->
-                        <div class="tab-pane fade" id="file" role="tabpanel">
-                            <div class="mb-3">
-                                <label for="fileInput" class="form-label">Выберите файл</label>
-                                <input type="file" class="form-control" id="fileInput" accept=".txt,.pdf,.docx">
-                                <div class="form-text">Поддерживаются .txt, .pdf, .docx (макс 10 МБ)</div>
-                            </div>
-                            <div id="fileInfo" class="alert alert-info d-none"></div>
+                    <!-- Вкладка Текст -->
+                    <div x-show="tab === 'text'" x-transition>
+                        <div class="mb-3">
+                            <label class="form-label">Введите текст</label>
+                            <textarea class="form-control"
+                                      x-model="text"
+                                      @input="analyzeAndUpdateSliders()"
+                                      rows="8"
+                                      placeholder="Вставьте текст для суммаризации..."></textarea>
                         </div>
                     </div>
 
+                    <!-- Вкладка Файл -->
+                    <div x-show="tab === 'file'" x-transition>
+                        <div class="mb-3">
+                            <label class="form-label">Выберите файл</label>
+                            <input type="file"
+                                   class="form-control"
+                                   accept=".txt,.pdf,.docx"
+                                   @change="uploadFile($event)">
+                            <div class="form-text">Поддерживаются .txt, .pdf, .docx (макс 10 МБ)</div>
+                        </div>
+                        <div x-show="fileInfo" x-text="fileInfo" class="alert" :class="fileInfoClass"></div>
+                    </div>
+
                     <!-- Выбор модели -->
-                    <div class="row mb-3">
+                    <div class="row mb-3 mt-3">
                         <div class="col-md-12">
                             <label class="form-label">Модель суммаризации</label>
-                            <select class="form-select" id="modelSelect">
-                                <optgroup label="Экстрактивные (выделение предложений)">
-                                    <option value="extractive_textrank" selected>TextRank</option>
+                            <select class="form-select" x-model="model" @change="updateModel()">
+                                <optgroup label="Экстрактивные">
+                                    <option value="extractive_textrank">TextRank</option>
                                     <option value="extractive_lsa">LSA</option>
                                     <option value="extractive_lexrank">LexRank</option>
                                 </optgroup>
-                                <optgroup label="Абстрактивные (нейросети)">
-                                    <option value="abstractive_mbart">mBART</option>
-                                    <option value="abstractive_rut5">ruT5</option>
-                                    <option value="abstractive_cointegrated">cointegrated/rut5-base-absum</option>
+                                <optgroup label="Абстрактивные">
+                                    <option value="abstractive_cointegrated">ruT5 Base (лёгкая)</option>
+                                    <option value="abstractive_rut5">ruT5 (средняя)</option>
+                                    <option value="abstractive_mbart">mBART (тяжёлая)</option>
                                 </optgroup>
                             </select>
                         </div>
                     </div>
 
-                    <!-- Параметры длины (динамически меняются) -->
-                    <div class="row mb-3">
+                    <!-- Параметры экстрактивные -->
+                    <div x-show="isExtractive" x-transition class="row mb-3">
                         <div class="col-md-12">
-                            <div id="extractiveParams">
-                                <label class="form-label">Количество предложений: <span id="sentenceCount">5</span></label>
-                                <input type="range" class="form-range" id="sentenceSlider" min="1" max="20" value="5">
-                                <div class="form-text">Сколько предложений оставить в реферате</div>
-                            </div>
+                            <label class="form-label">Количество предложений: <span x-text="sentenceCount"></span></label>
+                            <input type="range"
+                                   class="form-range"
+                                   x-model="sentenceCount"
+                                   x-ref="sentenceSlider"
+                                   min="1"
+                                   max="20"
+                                   step="1">
+                        </div>
+                    </div>
 
-                            <div id="abstractiveParams" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Минимум слов: <span id="minWords">50</span></label>
-                                        <input type="range" class="form-range" id="minWordsSlider" min="20" max="200" value="50" step="10">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Максимум слов: <span id="maxWords">150</span></label>
-                                        <input type="range" class="form-range" id="maxWordsSlider" min="50" max="500" value="150" step="10">
-                                    </div>
-                                </div>
-                                <div class="form-text">Диапазон длины реферата в словах</div>
-                            </div>
+                    <!-- Параметры абстрактивные -->
+                    <div x-show="!isExtractive" x-transition class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Минимум слов: <span x-text="minWords"></span></label>
+                            <input type="range" class="form-range" x-model="minWords" x-ref="minWordsSlider" min="20" max="490" step="10">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Максимум слов: <span x-text="maxWords"></span></label>
+                            <input type="range" class="form-range" x-model="maxWords" x-ref="maxWordsSlider" min="30" max="500" step="10">
                         </div>
                     </div>
 
                     <!-- Кнопка отправки -->
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                             Суммаризировать
+                        <button type="button" class="btn btn-primary btn-lg" @click="summarize" :disabled="loading">
+                            <span x-show="!loading">✨ Суммаризировать</span>
+                            <span x-show="loading">
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                Обработка...
+                            </span>
                         </button>
                     </div>
-                </form>
 
-                <!-- Индикатор загрузки -->
-                <div id="loading" class="text-center my-4 d-none">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Загрузка...</span>
-                    </div>
-                    <p class="mt-2">Обработка запроса...</p>
-                </div>
-
-                <!-- Результат -->
-                <div id="resultSection" class="mt-4 d-none">
-                    <hr>
-                    <h5>Результат:</h5>
-                    <div class="result-box" id="resultText"></div>
-                    <div class="mt-2 d-flex justify-content-between align-items-center">
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary" id="copyBtn">
+                    <!-- Результат -->
+                    <div x-show="result" x-transition class="mt-4">
+                        <hr>
+                        <h5>Результат:</h5>
+                        <div class="result-box" x-html="resultHtml"></div>
+                        <div class="mt-2 d-flex justify-content-between">
+                            <button class="btn btn-sm btn-outline-primary" @click="copyResult">
                                 <i class="bi bi-clipboard"></i> Копировать
                             </button>
-                            <span class="text-muted ms-2" id="processingTime"></span>
-                        </div>
-                        <div>
-                            <span class="badge bg-info" id="stats"></span>
+                            <span class="text-muted" x-text="processingTime"></span>
+                            <span class="badge bg-info" x-text="stats"></span>
                         </div>
                     </div>
                 </div>
@@ -148,164 +127,5 @@
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Переключение между экстрактивными и абстрактивными параметрами
-    const modelSelect = document.getElementById('modelSelect');
-    const extractiveParams = document.getElementById('extractiveParams');
-    const abstractiveParams = document.getElementById('abstractiveParams');
-
-    modelSelect.addEventListener('change', function() {
-        const model = this.value;
-        if (model.startsWith('extractive')) {
-            extractiveParams.style.display = 'block';
-            abstractiveParams.style.display = 'none';
-        } else {
-            extractiveParams.style.display = 'none';
-            abstractiveParams.style.display = 'block';
-        }
-    });
-
-    // Слайдеры
-    const sentenceSlider = document.getElementById('sentenceSlider');
-    const sentenceCount = document.getElementById('sentenceCount');
-    sentenceSlider.addEventListener('input', function() {
-        sentenceCount.textContent = this.value;
-    });
-
-    const minWordsSlider = document.getElementById('minWordsSlider');
-    const minWords = document.getElementById('minWords');
-    minWordsSlider.addEventListener('input', function() {
-        minWords.textContent = this.value;
-    });
-
-    const maxWordsSlider = document.getElementById('maxWordsSlider');
-    const maxWords = document.getElementById('maxWords');
-    maxWordsSlider.addEventListener('input', function() {
-        maxWords.textContent = this.value;
-    });
-
-    // Загрузка файла
-    document.getElementById('fileInput').addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-
-        document.getElementById('loading').classList.remove('d-none');
-
-        try {
-            const response = await fetch('/api/files/upload/', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                document.getElementById('fileInfo').textContent = `Файл загружен: ${data.original_filename} (${data.extracted_text.length} символов)`;
-                document.getElementById('fileInfo').classList.remove('d-none', 'alert-danger');
-                document.getElementById('fileInfo').classList.add('alert-success');
-
-                document.getElementById('text-tab').click();
-                document.getElementById('inputText').value = data.extracted_text;
-            } else {
-                document.getElementById('fileInfo').textContent = 'Ошибка: ' + (data.error || 'Неизвестная ошибка');
-                document.getElementById('fileInfo').classList.remove('d-none', 'alert-success');
-                document.getElementById('fileInfo').classList.add('alert-danger');
-            }
-        } catch (error) {
-            document.getElementById('fileInfo').textContent = 'Ошибка при загрузке файла';
-            document.getElementById('fileInfo').classList.remove('d-none', 'alert-success');
-            document.getElementById('fileInfo').classList.add('alert-danger');
-        } finally {
-            document.getElementById('loading').classList.add('d-none');
-        }
-    });
-
-    // Отправка на суммаризацию
-    document.getElementById('summarizeForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const text = document.getElementById('inputText').value.trim();
-        if (!text) {
-            alert('Введите текст или загрузите файл');
-            return;
-        }
-
-        const submitBtn = document.getElementById('submitBtn');
-        const loading = document.getElementById('loading');
-        const resultSection = document.getElementById('resultSection');
-
-        submitBtn.disabled = true;
-        loading.classList.remove('d-none');
-        resultSection.classList.add('d-none');
-
-        // Собираем параметры
-        const model = document.getElementById('modelSelect').value;
-
-        let lengthParam;
-        if (model.startsWith('extractive')) {
-            lengthParam = parseInt(document.getElementById('sentenceSlider').value);
-        } else {
-            // Для абстрактивных передаем объект с min/max
-            lengthParam = {
-                min: parseInt(document.getElementById('minWordsSlider').value),
-                max: parseInt(document.getElementById('maxWordsSlider').value)
-            };
-        }
-
-        const requestData = {
-            input_text: text,
-            model: model,
-            length_param: lengthParam
-        };
-
-        console.log('Отправляем:', requestData);
-
-        try {
-            const response = await fetch('/api/requests/summarize/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify(requestData)
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                document.getElementById('resultText').innerHTML = result.output_text.replace(/\n/g, '<br>');
-                document.getElementById('processingTime').textContent = `Время: ${result.processing_time.toFixed(2)} сек`;
-
-                // Считаем статистику
-                const words = result.output_text.split(/\s+/).length;
-                const sentences = result.output_text.split(/[.!?]+/).length - 1;
-                document.getElementById('stats').textContent = `Слов: ${words}, предложений: ${sentences}`;
-
-                resultSection.classList.remove('d-none');
-            } else {
-                alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            alert('Ошибка при отправке запроса');
-        } finally {
-            submitBtn.disabled = false;
-            loading.classList.add('d-none');
-        }
-    });
-
-    // Копирование результата
-    document.getElementById('copyBtn').addEventListener('click', function() {
-        const text = document.getElementById('resultText').innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            alert('Скопировано!');
-        });
-    });
-});
-</script>
+<script src="/static/js/home.js"></script>
 {% endblock %}

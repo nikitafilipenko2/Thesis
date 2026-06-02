@@ -1,0 +1,121 @@
+/* ========================================
+   Базовые стили
+   ======================================== */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.navbar {
+    background-color: #343a40 !important;
+    flex-shrink: 0;
+}
+
+.navbar-brand, .nav-link {
+    color: white !important;
+}
+
+.nav-link:hover {
+    color: #ffc107 !important;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+footer {
+    background-color: #343a40;
+    color: white;
+    padding: 20px 0;
+    margin-top: 50px;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Компоненты
+   ======================================== */
+.card {
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.result-box {
+    background-color: #f8f9fa;
+    border-left: 5px solid #007bff;
+    padding: 20px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+}
+
+/* ========================================
+   Вкладки
+   ======================================== */
+.nav-tabs .nav-link {
+    color: #000000 !important;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #000000 !important;
+}
+
+.nav-tabs .nav-link.active {
+    color: #000000 !important;
+    font-weight: 500;
+}
+
+/* ========================================
+   Анимации
+   ======================================== */
+.alert {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
+   Слайдеры
+   ======================================== */
+.form-range {
+    accent-color: #007bff;
+}
+
+/* ========================================
+   Утилиты
+   ======================================== */
+.accent {
+    color: #007bff;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-pre-wrap {
+    white-space: pre-wrap;
+}

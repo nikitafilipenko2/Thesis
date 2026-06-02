@@ -35,13 +35,13 @@ dmypy.json
 db.sqlite3
 default.db
 
-# Статические и медиа-файлы (если они генерируются)
+# Статик
 staticfiles/
 static_root/
 media/
 uploads/
 
-# Файлы окружения и секреты
+# Файлы окружения
 .env
 *.env
 .env.local
@@ -53,7 +53,7 @@ uploads/
 *.log
 *.log.*
 
-# IDE и редакторы
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -62,7 +62,7 @@ uploads/
 .DS_Store
 Thumbs.db
 
-# Django specific (но не миграции – их нужно коммитить)
+# Django
 *.pot
 *.mo
 *.po.new
