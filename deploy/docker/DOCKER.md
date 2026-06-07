@@ -2,36 +2,37 @@
 
 ## Stack
 
-- `web` — Django + Gunicorn
-- `db` — PostgreSQL
-- `nginx` — reverse proxy for static, media and HTTP traffic
+- `web` - Django + Gunicorn
+- `db` - PostgreSQL
+- `nginx` - reverse proxy for static, media and HTTP traffic
 
-## Prepare env
+## Files
 
-Copy the template and replace values:
+- `docker-compose.yml`
+- `backend/Dockerfile`
+- `backend/entrypoint.sh`
+- `.env.example`
+- `deploy/docker/nginx/default.conf`
+
+## First start
+
+Copy the root env template:
 
 ```bash
-cp deploy/docker/.env.docker.example .env
+cp .env.example .env
 ```
 
-Required fields:
+Fill at least:
 
 - `DJANGO_SECRET_KEY`
+- `POSTGRES_PASSWORD`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
-- `POSTGRES_PASSWORD`
 
-If you have a domain, set:
-
-```env
-DJANGO_ALLOWED_HOSTS=example.com,www.example.com
-DJANGO_CSRF_TRUSTED_ORIGINS=https://example.com,https://www.example.com
-```
-
-## Start
+Then start:
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build
 ```
 
 ## Stop
@@ -52,25 +53,69 @@ docker compose logs -f db
 ## Rebuild after changes
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build
 ```
 
-## Run tests in container
+## Management commands
 
-```bash
-docker compose exec web python manage.py test api
-```
-
-## Create superuser
+Create superuser:
 
 ```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-## Production note
+Open Django shell:
 
-For HTTPS on Ubuntu VPS:
+```bash
+docker compose exec web python manage.py shell
+```
 
-- keep this stack
-- put a real domain into `.env`
-- either terminate TLS in a host Nginx or add Certbot in front of this compose stack
+## Server preparation on Ubuntu VPS
+
+Install Docker:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin git
+sudo usermod -aG docker $USER
+```
+
+Reconnect to the server after adding your user to the `docker` group.
+
+## Deploy on VPS
+
+```bash
+cd /var/www
+git clone <your-repository-url> thesis
+cd thesis
+cp .env.example .env
+nano .env
+docker compose up -d --build
+```
+
+## Domain and HTTPS
+
+Right now the stack is ready for HTTP on port `80`.
+
+When you buy a domain:
+
+- point the `A` record to the VPS IP
+- update `.env`:
+  - `DJANGO_ALLOWED_HOSTS`
+  - `DJANGO_CSRF_TRUSTED_ORIGINS`
+- then either:
+  - terminate TLS in host Nginx with Certbot
+  - or put another reverse proxy in front of Docker
+
+## Notes
+
+- PostgreSQL data is stored in Docker volume `postgres_data`
+- static files are stored in `static_volume`
+- uploaded files are stored in `media_volume`
+- migrations and `collectstatic` run automatically on container start
