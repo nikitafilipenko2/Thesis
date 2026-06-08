@@ -8,148 +8,150 @@
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-10">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Суммаризация текста</h4>
-            </div>
-            <div class="card-body">
-                <div x-data="summarizerApp()" x-init="init()">
-                    <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{'active': tab === 'text'}" @click="tab = 'text'" type="button">
-                                <i class="bi bi-text-paragraph"></i> Текст
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{'active': tab === 'file'}" @click="tab = 'file'" type="button">
-                                <i class="bi bi-file-earmark"></i> Файл
-                            </button>
-                        </li>
-                    </ul>
+<div class="page-shell">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Суммаризация текста</h4>
+                </div>
+                <div class="card-body">
+                    <div x-data="summarizerApp()" x-init="init()">
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{'active': tab === 'text'}" @click="tab = 'text'" type="button">
+                                    <i class="bi bi-text-paragraph"></i> Текст
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{'active': tab === 'file'}" @click="tab = 'file'" type="button">
+                                    <i class="bi bi-file-earmark"></i> Файл
+                                </button>
+                            </li>
+                        </ul>
 
-                    <div x-show="tab === 'text'" x-transition>
-                        <div class="mb-3">
-                            <label class="form-label">Введите текст</label>
-                            <textarea
-                                class="form-control"
-                                x-model="text"
-                                rows="8"
-                                placeholder="Вставьте текст для суммаризации..."
-                            ></textarea>
+                        <div x-show="tab === 'text'" x-transition>
+                            <div class="mb-3">
+                                <label class="form-label">Введите текст</label>
+                                <textarea
+                                    class="form-control"
+                                    x-model="text"
+                                    rows="8"
+                                    placeholder="Вставьте текст для суммаризации..."
+                                ></textarea>
+                            </div>
                         </div>
-                    </div>
 
-                    <div x-show="tab === 'file'" x-transition>
+                        <div x-show="tab === 'file'" x-transition>
+                            <form
+                                hx-post="/upload/"
+                                hx-encoding="multipart/form-data"
+                                hx-target="#home-upload-feedback"
+                                hx-swap="innerHTML"
+                                @htmx:before-request="loading = true"
+                                @htmx:after-request="loading = false"
+                            >
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label class="form-label">Выберите файл</label>
+                                    <input
+                                        id="home-file-input"
+                                        type="file"
+                                        name="file"
+                                        class="form-control"
+                                        accept=".txt,.pdf,.docx"
+                                        @change="$el.form.requestSubmit()"
+                                    >
+                                    <div class="form-text">Поддерживаются .txt, .pdf и .docx файлы размером до 10 МБ</div>
+                                </div>
+                            </form>
+                            <div id="home-upload-feedback" class="mb-3"></div>
+                        </div>
+
                         <form
-                            hx-post="/upload/"
-                            hx-encoding="multipart/form-data"
-                            hx-target="#home-upload-feedback"
+                            hx-post="/summarize/"
+                            hx-target="#home-summary-result"
                             hx-swap="innerHTML"
                             @htmx:before-request="loading = true"
                             @htmx:after-request="loading = false"
                         >
                             {% csrf_token %}
-                            <div class="mb-3">
-                                <label class="form-label">Выберите файл</label>
-                                <input
-                                    id="home-file-input"
-                                    type="file"
-                                    name="file"
-                                    class="form-control"
-                                    accept=".txt,.pdf,.docx"
-                                    @change="$el.form.requestSubmit()"
-                                >
-                                <div class="form-text">Поддерживаются .txt, .pdf и .docx файлы размером до 10 МБ</div>
+                            <input type="hidden" name="input_text" :value="text">
+                            <input type="hidden" name="model" :value="model">
+                            <input type="hidden" name="sentence_count" :value="sentenceCount">
+                            <input type="hidden" name="min_words" :value="minWords">
+                            <input type="hidden" name="max_words" :value="maxWords">
+
+                            <div class="row mb-3 mt-3">
+                                <div class="col-md-12">
+                                    <label class="form-label">Модель суммаризации</label>
+                                    <select class="form-select" x-model="model">
+                                        <optgroup label="Экстрактивные">
+                                            <option value="extractive_textrank">TextRank</option>
+                                            <option value="extractive_lsa">LSA</option>
+                                            <option value="extractive_lexrank">LexRank</option>
+                                        </optgroup>
+                                        <optgroup label="Абстрактивные">
+                                            {% for model_name, model_config in abstractive_models %}
+                                                <option value="{{ model_name }}">{{ model_config.label }}</option>
+                                            {% endfor %}
+                                        </optgroup>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div x-show="isExtractive" x-transition class="row mb-3">
+                                <div class="col-md-12">
+                                    <label class="form-label">Количество предложений: <span x-text="sentenceCount"></span></label>
+                                    <input
+                                        type="range"
+                                        class="form-range"
+                                        x-model.number="sentenceCount"
+                                        min="1"
+                                        :max="sentenceSliderMax"
+                                        step="1"
+                                    >
+                                </div>
+                            </div>
+
+                            <div x-show="!isExtractive" x-transition class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Минимум слов: <span x-text="minWords"></span></label>
+                                    <input
+                                        type="range"
+                                        class="form-range"
+                                        x-model.number="minWords"
+                                        :min="abstractiveMinBound"
+                                        :max="minWordsSliderMax"
+                                        step="10"
+                                    >
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Максимум слов: <span x-text="maxWords"></span></label>
+                                    <input
+                                        type="range"
+                                        class="form-range"
+                                        x-model.number="maxWords"
+                                        :min="maxWordsSliderMin"
+                                        :max="abstractiveMaxBound"
+                                        step="10"
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
+                                    <span x-show="!loading">Суммаризировать</span>
+                                    <span x-show="loading">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        Обработка...
+                                    </span>
+                                </button>
                             </div>
                         </form>
-                        <div id="home-upload-feedback" class="mb-3"></div>
+
+                        <div id="home-summary-result"></div>
                     </div>
-
-                    <form
-                        hx-post="/summarize/"
-                        hx-target="#home-summary-result"
-                        hx-swap="innerHTML"
-                        @htmx:before-request="loading = true"
-                        @htmx:after-request="loading = false"
-                    >
-                        {% csrf_token %}
-                        <input type="hidden" name="input_text" :value="text">
-                        <input type="hidden" name="model" :value="model">
-                        <input type="hidden" name="sentence_count" :value="sentenceCount">
-                        <input type="hidden" name="min_words" :value="minWords">
-                        <input type="hidden" name="max_words" :value="maxWords">
-
-                        <div class="row mb-3 mt-3">
-                            <div class="col-md-12">
-                                <label class="form-label">Модель суммаризации</label>
-                                <select class="form-select" x-model="model">
-                                    <optgroup label="Экстрактивные">
-                                        <option value="extractive_textrank">TextRank</option>
-                                        <option value="extractive_lsa">LSA</option>
-                                        <option value="extractive_lexrank">LexRank</option>
-                                    </optgroup>
-                                    <optgroup label="Абстрактивные">
-                                        {% for model_name, model_config in abstractive_models %}
-                                            <option value="{{ model_name }}">{{ model_config.label }}</option>
-                                        {% endfor %}
-                                    </optgroup>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div x-show="isExtractive" x-transition class="row mb-3">
-                            <div class="col-md-12">
-                                <label class="form-label">Количество предложений: <span x-text="sentenceCount"></span></label>
-                                <input
-                                    type="range"
-                                    class="form-range"
-                                    x-model.number="sentenceCount"
-                                    min="1"
-                                    :max="sentenceSliderMax"
-                                    step="1"
-                                >
-                            </div>
-                        </div>
-
-                        <div x-show="!isExtractive" x-transition class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Минимум слов: <span x-text="minWords"></span></label>
-                                <input
-                                    type="range"
-                                    class="form-range"
-                                    x-model.number="minWords"
-                                    :min="abstractiveMinBound"
-                                    :max="minWordsSliderMax"
-                                    step="10"
-                                >
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Максимум слов: <span x-text="maxWords"></span></label>
-                                <input
-                                    type="range"
-                                    class="form-range"
-                                    x-model.number="maxWords"
-                                    :min="maxWordsSliderMin"
-                                    :max="abstractiveMaxBound"
-                                    step="10"
-                                >
-                            </div>
-                        </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
-                                <span x-show="!loading">Суммаризировать</span>
-                                <span x-show="loading">
-                                    <span class="spinner-border spinner-border-sm me-2"></span>
-                                    Обработка...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-
-                    <div id="home-summary-result"></div>
                 </div>
             </div>
         </div>
