@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -14,6 +15,8 @@ from .services.summarization_service import (
     summarize_file_text,
     summarize_text,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _save_summary_request(user, payload):
@@ -143,11 +146,12 @@ def home_summarize_view(request):
             {"error": str(error)},
             status=400,
         )
-    except Exception:
+    except Exception as error:
+        logger.exception("Unexpected error during home summarization")
         return render(
             request,
             "api/partials/home_summary_result.html",
-            {"error": "Не удалось сохранить результат суммаризации"},
+            {"error": f"Не удалось выполнить суммаризацию: {error}"},
             status=500,
         )
 
@@ -187,11 +191,12 @@ def file_summarize_view(request, pk):
             "danger",
             status=400,
         )
-    except Exception:
+    except Exception as error:
+        logger.exception("Unexpected error during file summarization")
         return _render_feedback(
             request,
             "api/partials/file_summary_feedback.html",
-            "Не удалось сохранить результат суммаризации",
+            f"Не удалось выполнить суммаризацию: {error}",
             "danger",
             status=500,
         )

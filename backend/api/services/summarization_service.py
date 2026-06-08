@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 
+from api.abstractive import AbstractiveSummarizerError
 from api.services.model_service import (
     get_default_abstractive_model_name,
     get_model,
@@ -49,7 +50,12 @@ def summarize_text(input_text, model_name, length_param):
         raise SummarizationServiceError("Текст не может быть пустым")
 
     started_at = time.time()
-    summarizer = get_model(model_name)
+
+    try:
+        summarizer = get_model(model_name)
+    except AbstractiveSummarizerError as error:
+        raise SummarizationServiceError(str(error)) from error
+
     if summarizer is None:
         raise SummarizationServiceError(f"Модель {model_name} недоступна")
 

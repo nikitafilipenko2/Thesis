@@ -1,4 +1,4 @@
-from api.abstractive import AbstractiveSummarizer, AbstractiveSummarizerError
+from api.abstractive import AbstractiveSummarizer
 from api.summarization import ExtractiveSummarizer
 
 
@@ -41,10 +41,7 @@ def get_model(model_name):
     if model_config["type"] == "extractive":
         model_instance = ExtractiveSummarizer(method=model_config["method"])
     else:
-        try:
-            model_instance = AbstractiveSummarizer(model_name=model_name)
-        except AbstractiveSummarizerError:
-            return None
+        model_instance = AbstractiveSummarizer(model_name=model_name)
 
     _model_cache[model_name] = model_instance
     return model_instance

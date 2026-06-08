@@ -13,7 +13,7 @@ COPY requirements.txt /app/requirements.txt
 
 RUN pip install --upgrade pip \
     && pip install -r /app/requirements.txt \
-    && python -m nltk.downloader stopwords
+    && python -m nltk.downloader stopwords punkt
 
 COPY . /app
 
