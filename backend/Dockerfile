@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/models-cache/huggingface
 
 WORKDIR /app
 
@@ -13,7 +14,7 @@ COPY requirements.txt /app/requirements.txt
 
 RUN pip install --upgrade pip \
     && pip install -r /app/requirements.txt \
-    && python -m nltk.downloader stopwords punkt
+    && python -m nltk.downloader stopwords punkt punkt_tab
 
 COPY . /app
 

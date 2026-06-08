@@ -29,6 +29,14 @@ Fill at least:
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
 
+If you want models to be downloaded before the web container starts, set:
+
+```env
+PRELOAD_MODEL_LIST=cointegrated/rut5-base-absum
+```
+
+You can list multiple models separated by commas, but this will require much more disk space.
+
 Then start:
 
 ```bash
@@ -116,6 +124,8 @@ When you buy a domain:
 ## Notes
 
 - PostgreSQL data is stored in Docker volume `postgres_data`
+- Hugging Face cache is stored in Docker volume `model_cache`
 - static files are stored in `static_volume`
 - uploaded files are stored in `media_volume`
 - migrations and `collectstatic` run automatically on container start
+- `model-init` downloads NLTK resources and selected Hugging Face models before `web` starts

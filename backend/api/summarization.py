@@ -22,21 +22,37 @@ class ExtractiveSummarizer:
         self.summarizer.stop_words = self._load_stop_words()
 
     @staticmethod
+    def _ensure_nltk_data():
+        try:
+            import nltk
+            from nltk.data import find
+        except ImportError:
+            return
+
+        resources = (
+            "corpora/stopwords",
+            "tokenizers/punkt",
+            "tokenizers/punkt_tab",
+        )
+
+        for resource in resources:
+            try:
+                find(resource)
+            except LookupError:
+                package_name = resource.split("/")[-1]
+                try:
+                    nltk.download(package_name, quiet=True)
+                except Exception:
+                    continue
+
+    @staticmethod
     def _load_stop_words():
         try:
-            from nltk import download
             from nltk.corpus import stopwords
-            from nltk.data import find
         except ImportError:
             return []
 
-        try:
-            find("corpora/stopwords")
-        except LookupError:
-            try:
-                download("stopwords", quiet=True)
-            except Exception:
-                return []
+        ExtractiveSummarizer._ensure_nltk_data()
 
         try:
             return stopwords.words("russian")
@@ -47,6 +63,8 @@ class ExtractiveSummarizer:
         normalized_text = " ".join((text or "").split())
         if not normalized_text:
             return ""
+
+        self._ensure_nltk_data()
 
         parser = PlaintextParser.from_string(normalized_text, Tokenizer(self.language))
         total_sentences = len(list(parser.document.sentences))

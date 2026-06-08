@@ -1,4 +1,18 @@
 services:
+  model-init:
+    build:
+      context: ./backend
+    container_name: thesis-model-init
+    restart: "no"
+    env_file:
+      - ./.env
+    environment:
+      HF_HOME: /models-cache/huggingface
+      POSTGRES_ENABLED: "False"
+    entrypoint: ["python", "/app/preload_models.py"]
+    volumes:
+      - model_cache:/models-cache
+
   db:
     image: postgres:16-alpine
     container_name: thesis-db
@@ -23,12 +37,16 @@ services:
     env_file:
       - ./.env
     environment:
+      HF_HOME: /models-cache/huggingface
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
     depends_on:
+      model-init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     volumes:
+      - model_cache:/models-cache
       - static_volume:/app/staticfiles
       - media_volume:/app/media
 
@@ -47,5 +65,6 @@ services:
 
 volumes:
   postgres_data:
+  model_cache:
   static_volume:
   media_volume:
