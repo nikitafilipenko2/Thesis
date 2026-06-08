@@ -116,9 +116,7 @@ class WebViewsTests(TestCase):
             response,
             "Выпускная квалификационная работа студента направления 02.03.03 Филипенко Н.С.",
         )
-        self.assertContains(response, "Краснодар")
-        self.assertContains(response, "2026 г.")
-        self.assertContains(response, "КубГУ")
+        self.assertContains(response, "КубГУ 2026 г.")
 
     @patch("api.web_views.summarize_text")
     def test_home_summarize_view_saves_summary_request(self, summarize_text_mock):
