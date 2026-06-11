@@ -1,4 +1,5 @@
 import warnings
+import math
 
 import torch
 from transformers import pipeline
@@ -51,21 +52,42 @@ class AbstractiveSummarizer:
         if total_sentences <= 1:
             return text[: self.MAX_INPUT_CHARS]
 
-        target_sentences = max(1, min(total_sentences, total_sentences // 2))
-        reduced_text = text
+        estimated_target = max(
+            1,
+            min(
+                total_sentences,
+                math.ceil(total_sentences * (self.MAX_INPUT_CHARS / max(len(text), 1)) * 0.9),
+            ),
+        )
 
-        while target_sentences >= 1:
-            candidate = self.prefilter.summarize(text, target_sentences).strip()
-            if candidate and len(candidate) <= self.MAX_INPUT_CHARS:
-                return candidate
-            if candidate:
-                reduced_text = candidate
-            target_sentences -= 1
+        best_candidate = ""
+        low = 1
+        high = estimated_target
+        attempts = 0
 
-        if len(reduced_text) <= self.MAX_INPUT_CHARS:
-            return reduced_text
+        while low <= high and attempts < 7:
+            attempts += 1
+            mid = (low + high) // 2
+            candidate = self.prefilter.summarize(text, mid).strip()
+            if not candidate:
+                high = mid - 1
+                continue
 
-        return reduced_text[: self.MAX_INPUT_CHARS]
+            if len(candidate) <= self.MAX_INPUT_CHARS:
+                best_candidate = candidate
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        if best_candidate:
+            return best_candidate
+
+        fallback_target = min(estimated_target, max(1, total_sentences // 4))
+        fallback_candidate = self.prefilter.summarize(text, fallback_target).strip()
+        if fallback_candidate:
+            return fallback_candidate[: self.MAX_INPUT_CHARS]
+
+        return text[: self.MAX_INPUT_CHARS]
 
     def summarize(self, text, max_length=150, min_length=50):
         normalized_text = self._normalize_text(text)
