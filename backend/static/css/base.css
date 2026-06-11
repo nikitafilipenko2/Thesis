@@ -75,6 +75,52 @@ footer {
 
 .alert {
     animation: slideIn 0.3s ease-out;
+    border: 0;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+
+.alert-success {
+    background-color: #198754;
+    color: #ffffff;
+}
+
+.alert-danger {
+    background-color: #dc3545;
+    color: #ffffff;
+}
+
+.alert-info {
+    background-color: #0d6efd;
+    color: #ffffff;
+}
+
+.alert-warning {
+    background-color: #fd7e14;
+    color: #ffffff;
+}
+
+.alert .btn-close {
+    filter: invert(1);
+}
+
+.alert.position-fixed {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.alert.position-fixed.alert-success {
+    background: #198754;
+}
+
+.alert.position-fixed.alert-danger {
+    background: #dc3545;
+}
+
+.alert.position-fixed.alert-info {
+    background: #0d6efd;
+}
+
+.alert.position-fixed.alert-warning {
+    background: #fd7e14;
 }
 
 @keyframes slideIn {
