@@ -23,13 +23,13 @@ function summarizerApp() {
             return 20;
         },
         get abstractiveMaxBound() {
-            return Math.max(30, Math.min(500, Math.floor(this.totalWords * 0.3) || 150));
+            return Math.max(60, Math.min(500, Math.floor(this.totalWords * 0.3) || 150));
         },
         get minWordsSliderMax() {
             return Math.max(this.abstractiveMinBound, this.abstractiveMaxBound - 10);
         },
         get maxWordsSliderMin() {
-            return Math.min(this.abstractiveMaxBound, this.minWords + 10);
+            return Math.min(this.abstractiveMaxBound - 10, this.minWords + 10);
         },
         normalizeSavedModel(model) {
             const allowedModels = [
@@ -52,28 +52,27 @@ function summarizerApp() {
             }
         },
         normalizeAbstractiveRange() {
-            const sliderMax = this.abstractiveMaxBound;
-            const minSliderMax = this.minWordsSliderMax;
+            const minBound = this.abstractiveMinBound;
+            const maxBound = this.abstractiveMaxBound;
+            let nextMin = this.minWords;
+            let nextMax = this.maxWords;
 
-            if (this.minWords < this.abstractiveMinBound) {
-                this.minWords = this.abstractiveMinBound;
-            }
-            if (this.minWords > minSliderMax) {
-                this.minWords = minSliderMax;
+            nextMin = Math.round(nextMin / 10) * 10;
+            nextMax = Math.round(nextMax / 10) * 10;
+
+            nextMin = Math.max(minBound, Math.min(nextMin, maxBound - 10));
+            nextMax = Math.max(nextMin + 10, Math.min(nextMax, maxBound));
+
+            if (nextMax > maxBound) {
+                nextMax = maxBound;
+                nextMin = Math.max(minBound, nextMax - 10);
             }
 
-            if (this.maxWords < this.minWords + 10) {
-                this.maxWords = this.minWords + 10;
+            if (this.minWords !== nextMin) {
+                this.minWords = nextMin;
             }
-            if (this.maxWords > sliderMax) {
-                this.maxWords = sliderMax;
-            }
-
-            if (this.maxWords <= this.minWords) {
-                this.maxWords = Math.min(sliderMax, this.minWords + 10);
-            }
-            if (this.minWords >= this.maxWords) {
-                this.minWords = Math.max(this.abstractiveMinBound, this.maxWords - 10);
+            if (this.maxWords !== nextMax) {
+                this.maxWords = nextMax;
             }
         },
         analyzeAndUpdateSliders() {
