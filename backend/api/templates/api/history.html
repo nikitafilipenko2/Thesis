@@ -16,7 +16,6 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Тип</th>
-                                <th>Модель</th>
                                 <th>Длина</th>
                                 <th>Время</th>
                                 <th>Дата</th>
@@ -36,7 +35,6 @@
                                             <span class="badge bg-success">Абстрактивный</span>
                                         {% endif %}
                                     </td>
-                                    <td data-label="Модель">{{ req.model_name|default:"-" }}</td>
                                     <td data-label="Длина">{{ req.length_param }}</td>
                                     <td data-label="Время">{{ req.processing_time|floatformat:2 }} с</td>
                                     <td data-label="Дата">{{ req.created_at|date:"d.m.Y H:i" }}</td>
