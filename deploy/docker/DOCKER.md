@@ -100,7 +100,7 @@ Reconnect to the server after adding your user to the `docker` group.
 
 ```bash
 cd /var/www
-git clone <your-repository-url> thesis
+git clone https://github.com/nikitafilipenko2/Thesis.git thesis
 cd thesis
 cp .env.example .env
 nano .env
